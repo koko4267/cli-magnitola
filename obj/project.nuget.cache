@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "O6P4z1nQDE8=",
+  "success": true,
+  "projectFilePath": "F:\\repos\\sc-magnitola\\sc-magnitola-downloader.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\rafan\\.nuget\\packages\\taglibsharp\\2.3.0\\taglibsharp.2.3.0.nupkg.sha512"
+  ],
+  "logs": []
+}

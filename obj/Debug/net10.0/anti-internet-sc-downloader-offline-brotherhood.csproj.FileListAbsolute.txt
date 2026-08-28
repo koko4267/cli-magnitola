@@ -1,0 +1,17 @@
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\bin\Debug\net10.0\anti-internet-sc-downloader-offline-brotherhood.exe
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\bin\Debug\net10.0\anti-internet-sc-downloader-offline-brotherhood.deps.json
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\bin\Debug\net10.0\anti-internet-sc-downloader-offline-brotherhood.runtimeconfig.json
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\bin\Debug\net10.0\anti-internet-sc-downloader-offline-brotherhood.dll
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\bin\Debug\net10.0\anti-internet-sc-downloader-offline-brotherhood.pdb
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\obj\Debug\net10.0\anti-internet-sc-downloader-offline-brotherhood.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\obj\Debug\net10.0\anti-internet-sc-downloader-offline-brotherhood.AssemblyInfoInputs.cache
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\obj\Debug\net10.0\anti-internet-sc-downloader-offline-brotherhood.AssemblyInfo.cs
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\obj\Debug\net10.0\anti-internet-sc-downloader-offline-brotherhood.csproj.CoreCompileInputs.cache
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\obj\Debug\net10.0\anti-internet-sc-downloader-offline-brotherhood.dll
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\obj\Debug\net10.0\refint\anti-internet-sc-downloader-offline-brotherhood.dll
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\obj\Debug\net10.0\anti-internet-sc-downloader-offline-brotherhood.pdb
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\obj\Debug\net10.0\anti-internet-sc-downloader-offline-brotherhood.genruntimeconfig.cache
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\obj\Debug\net10.0\ref\anti-internet-sc-downloader-offline-brotherhood.dll
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\bin\Debug\net10.0\TagLibSharp.dll
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\obj\Debug\net10.0\anti-internet-sc-downloader-offline-brotherhood.csproj.AssemblyReference.cache
+C:\Users\rafan\source\repos\anti-internet-sc-downloader-offline-brotherhood\obj\Debug\net10.0\anti-int.16EF3B14.Up2Date
