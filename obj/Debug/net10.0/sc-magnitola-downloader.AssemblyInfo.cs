@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("sc-magnitola-downloader")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+623640c570e8906365c53413dcd7f3f27a24b6f7")]
 [assembly: System.Reflection.AssemblyProductAttribute("sc-magnitola-downloader")]
 [assembly: System.Reflection.AssemblyTitleAttribute("sc-magnitola-downloader")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
