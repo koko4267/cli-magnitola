@@ -1,103 +1,67 @@
-# MAGNITOLA
+﻿# MAGNITOLA
 
-Music downloader.
+SoundCloud music downloader written in C# (.NET 10).
 
 ## Features
-- Downloads single tracks, playlists, and user favorites.
+
+- Downloads single tracks, playlists, and all user likes.
 - Embeds ID3 tags and artwork (500x500).
 - Automatically saves files directly into the system Downloads folder.
-- Standalone portable application (no installation required).
 - Supports Windows, macOS, and Linux.
 - Multilingual interface (English / Russian).
 
 ## Requirements
-- Node.js 18 or higher (for running from source).
-- Or download the ready portable `MAGNITOLA.exe` from Releases.
+
+- .NET 10 SDK or higher.
 
 ## How to Run
 
-Install dependencies:
+1. Build the project:
 ```bash
-npm install
+dotnet build
 ```
 
-Run the application:
+2. Run the application:
 ```bash
-npm start
+dotnet run
 ```
 
-## Build
-
-Build portable executable for Windows:
+You can also pass a link directly as a command-line argument:
 ```bash
-npm run build:win
+dotnet run -- "https://soundcloud.com/artist/track-name"
 ```
-
-Build for Linux:
-```bash
-npm run build:linux
-```
-
-Build for macOS:
-```bash
-npm run build:mac
-```
-
-## Disclaimer
-This application is created for educational and personal archiving purposes only. The author is not responsible for the unauthorized downloading of copyrighted content.
-
-## License
-MIT
 
 ---
 
 # MAGNITOLA
 
-Загрузчик музыки.
+Загрузчик музыки с SoundCloud на C# (.NET 10).
 
 ## Возможности
-- Скачивание отдельных треков, плейлистов и избранного пользователя.
+
+- Скачивание отдельных треков, плейлистов и всех лайков пользователя.
 - Встраивание ID3-тегов и обложек (500x500).
 - Автоматическое сохранение файлов в системную папку «Загрузки».
-- Портативное приложение (не требует установки).
 - Поддержка Windows, macOS и Linux.
 - Двуязычный интерфейс (русский / английский).
 
 ## Требования
-- Node.js 18 или выше (для запуска из исходников).
-- Либо готовый portable-файл `MAGNITOLA.exe` из Releases.
+
+- .NET 10 SDK или выше.
 
 ## Запуск
 
-Установка зависимостей:
+1. Сборка проекта:
 ```bash
-npm install
+dotnet build
 ```
 
-Запуск приложения:
+2. Запуск приложения:
 ```bash
-npm start
+dotnet run
 ```
 
-## Сборка
-
-Сборка portable .exe для Windows:
+Также можно передать ссылку напрямую аргументом:
 ```bash
-npm run build:win
+dotnet run -- "https://soundcloud.com/artist/track-name"
 ```
-
-Сборка для Linux:
-```bash
-npm run build:linux
-```
-
-Сборка для macOS:
-```bash
-npm run build:mac
-```
-
-## Отказ от ответственности
-Приложение разработано исключительно в образовательных целях и для личного архивирования. Автор не несет ответственности за скачивание материалов, защищенных авторским правом.
-
-## Лицензия
-MIT
