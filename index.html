@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MAGNITOLA</title>
+  <link rel="icon" type="image/png" href="magnitolalogo.png">
+  <style>
+    /* ==========================================================================
+       CLEAN RETRO DESKTOP UI (Zero radius, Zero blur, Solid palette)
+       ========================================================================== */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      backdrop-filter: none !important;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    :root {
+      --bg-main: #4c5844;
+      --bg-header: #3b4435;
+      --bg-dark: #282e22;
+      --bg-panel: #242a20;
+      --bg-input: #1c2219;
+      --border-highlight: #6b7c61;
+      --border-shadow: #1e2419;
+      --border-light: #5d6d53;
+      --border-dark: #171c14;
+      --btn-bg: #4e5a46;
+      --btn-hover: #586650;
+      --btn-active: #384232;
+      --text-main: #d0dcce;
+      --text-bright: #ffffff;
+      --text-muted: #8c9c86;
+      --green-bar: #95c34e;
+      --green-dark: #7aa53d;
+      --accent-gold: #e2c174;
+      --accent-red: #d15656;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      font-family: "Tahoma", "Segoe UI", Arial, sans-serif;
+      font-size: 11px;
+      line-height: 1.35;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+
+
+    /* Single Language Toggle Button with Flag */
+    .single-lang-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--btn-bg);
+      border-top: 1px solid var(--border-highlight);
+      border-left: 1px solid var(--border-highlight);
+      border-bottom: 1px solid var(--border-shadow);
+      border-right: 1px solid var(--border-shadow);
+      color: var(--text-bright);
+      padding: 2px 8px;
+      height: 22px;
+      font-size: 10px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .single-lang-btn:hover {
+      background-color: var(--btn-hover);
+    }
+    .single-lang-btn:active {
+      border-top: 1px solid var(--border-shadow);
+      border-left: 1px solid var(--border-shadow);
+      border-bottom: 1px solid var(--border-highlight);
+      border-right: 1px solid var(--border-highlight);
+      background-color: var(--btn-active);
+    }
+    .flag-icon {
+      width: 15px;
+      height: 10px;
+      display: inline-block;
+      border: 1px solid #000;
+    }
+
+    /* Main Container */
+    .main-body {
+      flex: 1;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background-color: var(--bg-main);
+      overflow-y: auto;
+    }
+
+    /* Retro Groupbox */
+    .groupbox {
+      border-top: 1px solid var(--border-highlight);
+      border-left: 1px solid var(--border-highlight);
+      border-right: 1px solid var(--border-shadow);
+      border-bottom: 1px solid var(--border-shadow);
+      padding: 10px;
+      position: relative;
+    }
+    .groupbox-title {
+      font-weight: bold;
+      color: var(--accent-gold);
+      font-size: 11px;
+      margin-bottom: 8px;
+    }
+
+    /* Buttons */
+    .btn {
+      background-color: var(--btn-bg);
+      color: var(--text-main);
+      border-top: 1px solid var(--border-highlight);
+      border-left: 1px solid var(--border-highlight);
+      border-bottom: 1px solid var(--border-shadow);
+      border-right: 1px solid var(--border-shadow);
+      padding: 4px 14px;
+      font-family: "Tahoma", sans-serif;
+      font-size: 11px;
+      font-weight: bold;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 26px;
+    }
+    .btn:hover {
+      background-color: var(--btn-hover);
+      color: var(--text-bright);
+    }
+    .btn:active {
+      border-top: 1px solid var(--border-shadow);
+      border-left: 1px solid var(--border-shadow);
+      border-bottom: 1px solid var(--border-highlight);
+      border-right: 1px solid var(--border-highlight);
+      background-color: var(--btn-active);
+      color: var(--text-bright);
+    }
+    .btn:disabled {
+      background-color: #384033;
+      color: #636f5c;
+      border-color: #434c3d;
+      cursor: not-allowed;
+    }
+    .btn-primary {
+      color: #ffffff;
+      background-color: #55664c;
+      border-top-color: #7b946d;
+      border-left-color: #7b946d;
+    }
+    .btn-primary:hover {
+      background-color: #617556;
+    }
+
+    /* Text Input */
+    .input-text {
+      background-color: var(--bg-input);
+      color: var(--text-bright);
+      border-top: 1px solid var(--border-dark);
+      border-left: 1px solid var(--border-dark);
+      border-bottom: 1px solid var(--border-light);
+      border-right: 1px solid var(--border-light);
+      padding: 4px 8px;
+      font-family: "Lucida Console", "Consolas", monospace;
+      font-size: 11px;
+      height: 26px;
+      width: 100%;
+      user-select: text;
+    }
+    .input-text:focus {
+      outline: 1px solid var(--green-bar);
+    }
+
+    .url-bar-row {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    /* Download Card */
+    .download-card {
+      display: flex;
+      gap: 12px;
+      padding: 10px;
+      background-color: var(--bg-panel);
+      border-top: 1px solid var(--border-dark);
+      border-left: 1px solid var(--border-dark);
+      border-bottom: 1px solid var(--border-light);
+      border-right: 1px solid var(--border-light);
+    }
+    .album-art-box {
+      width: 84px;
+      height: 84px;
+      min-width: 84px;
+      background-color: #171c14;
+      border: 1px solid var(--bg-dark);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .album-art-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .album-art-placeholder {
+      color: var(--accent-gold);
+      font-size: 28px;
+      font-weight: bold;
+      font-family: "Tahoma", sans-serif;
+      user-select: none;
+    }
+
+    .track-details-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-width: 0;
+    }
+    .track-title {
+      font-size: 12px;
+      font-weight: bold;
+      color: var(--text-bright);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .track-artist {
+      font-size: 11px;
+      color: var(--accent-gold);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Retro Progress Bar */
+    .progress-track {
+      background-color: #171c14;
+      height: 18px;
+      border-top: 1px solid #11140e;
+      border-left: 1px solid #11140e;
+      border-bottom: 1px solid var(--border-light);
+      border-right: 1px solid var(--border-light);
+      position: relative;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: repeating-linear-gradient(
+        90deg,
+        var(--green-bar) 0px,
+        var(--green-bar) 7px,
+        var(--green-dark) 7px,
+        var(--green-dark) 9px
+      );
+      transition: width 0.1s linear;
+    }
+    .progress-text {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: bold;
+      color: #ffffff;
+      text-shadow: 1px 1px 0px #000;
+    }
+
+    .download-stats-row {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: "Lucida Console", "Consolas", monospace;
+    }
+
+    /* Quotes Box - hidden until link is pasted */
+    .quote-box {
+      margin-top: 6px;
+      padding: 4px 8px;
+      background-color: #21261d;
+      border: 1px solid #1b2017;
+      color: var(--accent-gold);
+      font-style: italic;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: none; /* Only appears after link is inserted */
+    }
+
+    /* Save Path Info */
+    .save-path-row {
+      margin-top: 10px;
+      padding: 6px 10px;
+      background-color: var(--bg-panel);
+      border: 1px solid var(--border-shadow);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Try Syncline Promo Widget (Bottom Left) */
+    .syncline-widget {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+      color: var(--text-main);
+      background-color: var(--bg-panel);
+      border-top: 1px solid var(--border-dark);
+      border-left: 1px solid var(--border-dark);
+      border-bottom: 1px solid var(--border-light);
+      border-right: 1px solid var(--border-light);
+      padding: 3px 10px;
+      height: 32px;
+      transition: background-color 0.1s;
+    }
+    .syncline-widget:hover {
+      background-color: #2e3629;
+    }
+    .syncline-widget:hover .syncline-btn {
+      background-color: var(--btn-hover);
+      color: #ffffff;
+    }
+    .syncline-logo-img {
+      width: 24px;
+      height: 24px;
+      object-fit: contain;
+      display: block;
+    }
+    .syncline-text {
+      font-size: 11px;
+      font-weight: bold;
+      color: var(--accent-gold);
+      letter-spacing: 0.3px;
+    }
+    .syncline-btn {
+      background-color: var(--btn-bg);
+      color: var(--text-bright);
+      border-top: 1px solid var(--border-highlight);
+      border-left: 1px solid var(--border-highlight);
+      border-bottom: 1px solid var(--border-shadow);
+      border-right: 1px solid var(--border-shadow);
+      padding: 2px 8px;
+      font-size: 10px;
+      font-weight: bold;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- Single Screen Body -->
+  <div class="main-body">
+
+    <!-- Input Box -->
+    <div class="groupbox">
+      <div class="groupbox-title" id="lblUrlPrompt">Paste link:</div>
+      <div class="url-bar-row">
+        <input type="text" class="input-text" id="inputUrl" placeholder="Link to profile, track, playlist, album" spellcheck="false" autocomplete="off" />
+        <button class="btn" id="btnPaste">Paste</button>
+        <button class="btn btn-primary" id="btnStartDownload">Download</button>
+        <button class="btn" id="btnStopDownload" disabled>Stop</button>
+      </div>
+    </div>
+
+    <!-- Active Download Card -->
+    <div class="groupbox" style="flex: 1; display: flex; flex-direction: column;">
+      <div class="groupbox-title" id="lblCurrentStatus">Current download:</div>
+      
+      <div class="download-card">
+        <div class="album-art-box" id="albumArtBox">
+          <span class="album-art-placeholder" id="albumArtIcon">?</span>
+          <img id="albumArtImg" src="" alt="Cover" style="display: none;" />
+        </div>
+        
+        <div class="track-details-col">
+          <div>
+            <div class="track-title" id="currentTrackTitle">Waiting for link input...</div>
+            <div class="track-artist" id="currentTrackArtist">MAGNITOLA</div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div>
+            <div class="progress-track">
+              <div class="progress-fill" id="trackProgressFill"></div>
+              <div class="progress-text" id="trackProgressText">0%</div>
+            </div>
+            <div class="download-stats-row">
+              <span id="downloadSizeStats">0.00 / 0.00 MB</span>
+              <span id="downloadSpeedStats">0 KB/s</span>
+              <span id="downloadCounterStats">Track 0 of 0</span>
+            </div>
+          </div>
+
+          <!-- Quotes Easter Egg (Shown only when link is provided or downloading) -->
+          <div class="quote-box" id="quoteDisplay">
+            💬 «God invented computers»
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Controls: Try Syncline (Left) & Save Folder / Language (Right) -->
+      <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+        <a href="https://sync-line.pages.dev/" target="_blank" rel="noopener noreferrer" class="syncline-widget" title="Visit Syncline (https://sync-line.pages.dev/)">
+          <img src="synclinelogo.png" alt="Syncline Logo" class="syncline-logo-img" />
+          <span class="syncline-text">try syncline</span>
+          <span class="syncline-btn">Open ↗</span>
+        </a>
+
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <div class="save-path-row" id="saveLocationInfo" style="margin-top: 0;">
+            Save folder: <strong id="saveFolderPath">Downloads</strong>
+          </div>
+          <!-- Single Language Toggle Button -->
+          <button class="single-lang-btn" id="btnToggleLang" title="Switch language / Сменить язык">
+            <svg class="flag-icon" id="flagSvg" viewBox="0 0 640 480">
+              <rect width="640" height="480" fill="#bf0a30"/>
+              <rect y="37" width="640" height="37" fill="#ffffff"/>
+              <rect y="111" width="640" height="37" fill="#ffffff"/>
+              <rect y="185" width="640" height="37" fill="#ffffff"/>
+              <rect y="259" width="640" height="37" fill="#ffffff"/>
+              <rect y="333" width="640" height="37" fill="#ffffff"/>
+              <rect y="407" width="640" height="37" fill="#ffffff"/>
+              <rect width="260" height="259" fill="#002868"/>
+            </svg>
+            <span id="langLabel">EN</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <!-- Logic Script -->
+  <script>
+    /* ==========================================================================
+       LOCALIZATION DICTIONARIES
+       ========================================================================== */
+    const LOCALES = {
+      ru: {
+        urlPrompt: "Вставьте ссылку:",
+        placeholder: "Ссылка на профиль, трек, плейлист, альбом",
+        currentStatus: "Текущая загрузка:",
+        saveLocation: "Папка сохранения: ",
+        saveFolderDefault: "Загрузки",
+        paste: "Вставить",
+        startDownload: "Скачать",
+        stopDownload: "Стоп",
+        waitingInput: "Ожидание ввода ссылки...",
+        ready: "Готов к загрузке",
+        resolvingUrl: "Определение ссылки...",
+        downloading: "Скачивание трека...",
+        alreadyExists: "Уже существует",
+        finished: "Загрузка завершена!",
+        failed: "Ошибка скачивания",
+        emptyUrlError: "Ошибка: ссылка не указана.",
+        invalidUrlError: "Неподдерживаемая ссылка. Укажите профиль, трек, плейлист или альбом.",
+        noTracksFound: "Треки для скачивания не найдены.",
+        trackPrefix: "Трек",
+        fromWord: "из",
+        quotes: [
+          "Компьютеры придумал господь Бог",
+          "Хочешь поиграть в хоррор?",
+          "Если я поддерживаю ******* если я уважаю ******* то я что? ****** чтоли?",
+          "мой мак мой мак сейчас монтирует доту",
+          "я выучил фреймворк по дотнету",
+          "колесо смерти"
+        ]
+      },
+      en: {
+        urlPrompt: "Paste link:",
+        placeholder: "Link to profile, track, playlist, album",
+        currentStatus: "Current download:",
+        saveLocation: "Save folder: ",
+        saveFolderDefault: "Downloads",
+        paste: "Paste",
+        startDownload: "Download",
+        stopDownload: "Stop",
+        waitingInput: "Waiting for link input...",
+        ready: "Ready to download",
+        resolvingUrl: "Resolving link...",
+        downloading: "Downloading track...",
+        alreadyExists: "Already exists",
+        finished: "Download finished!",
+        failed: "Download failed",
+        emptyUrlError: "Error: No link provided.",
+        invalidUrlError: "Unsupported link. Please provide a profile, track, playlist, or album link.",
+        noTracksFound: "No tracks found for download.",
+        trackPrefix: "Track",
+        fromWord: "of",
+        quotes: [
+          "God invented computers",
+          "Do you want to play a horror game?",
+          "If I support ******* if I respect ******* then what am I? ****** or something?",
+          "my mac my mac is rendering dota right now",
+          "I learned a .NET framework",
+          "wheel of death"
+        ]
+      }
+    };
+
+    let currentLang = 'en';
+    let L = LOCALES[currentLang];
+
+    // Client ID for background API queries
+    let clientId = "so5r9Dsxv6jJRgHa5fGXfevkxr4VgNJf";
+    let isDownloading = false;
+    let cancelRequested = false;
+    let quoteInterval = null;
+    let currentQuoteIndex = 0;
+
+    // Electron environment integration
+    const isElectron = (typeof window !== 'undefined' && typeof window.process === 'object' && window.process.type === 'renderer') || (typeof require !== 'undefined');
+
+    // DOM Elements
+    const inputUrl = document.getElementById('inputUrl');
+    const btnPaste = document.getElementById('btnPaste');
+    const btnStartDownload = document.getElementById('btnStartDownload');
+    const btnStopDownload = document.getElementById('btnStopDownload');
+    const albumArtBox = document.getElementById('albumArtBox');
+    const albumArtImg = document.getElementById('albumArtImg');
+    const albumArtIcon = document.getElementById('albumArtIcon');
+    const currentTrackTitle = document.getElementById('currentTrackTitle');
+    const currentTrackArtist = document.getElementById('currentTrackArtist');
+    const trackProgressFill = document.getElementById('trackProgressFill');
+    const trackProgressText = document.getElementById('trackProgressText');
+    const downloadSizeStats = document.getElementById('downloadSizeStats');
+    const downloadSpeedStats = document.getElementById('downloadSpeedStats');
+    const downloadCounterStats = document.getElementById('downloadCounterStats');
+    const quoteDisplay = document.getElementById('quoteDisplay');
+    const statusBarText = document.getElementById('statusBarText');
+    const statusBulb = document.getElementById('statusBulb');
+    function setStatus(text, isBusy = false) {
+      if (statusBarText) statusBarText.textContent = text;
+      if (statusBulb) statusBulb.className = isBusy ? 'status-bulb busy' : 'status-bulb online';
+    }
+    const btnToggleLang = document.getElementById('btnToggleLang');
+    const langLabel = document.getElementById('langLabel');
+    const flagSvg = document.getElementById('flagSvg');
+
+    function updateSavePathDisplay() {
+      const el = document.getElementById('saveFolderPath');
+      if (!el) return;
+      if (isElectron && typeof require !== 'undefined') {
+        try {
+          const path = require('path');
+          const os = require('os');
+          el.textContent = path.join(os.homedir(), 'Downloads');
+          return;
+        } catch (e) {}
+      }
+      el.textContent = L.saveFolderDefault;
+    }
+
+    /* ==========================================================================
+       LANGUAGE TOGGLE (Single button with Flag)
+       ========================================================================== */
+    function setLanguage(lang) {
+      currentLang = lang;
+      L = LOCALES[lang];
+
+      if (lang === 'ru') {
+        langLabel.textContent = "RU";
+        flagSvg.innerHTML = `
+          <rect width="640" height="160" fill="#ffffff"/>
+          <rect y="160" width="640" height="160" fill="#0039a6"/>
+          <rect y="320" width="640" height="160" fill="#d52b1e"/>
+        `;
+      } else {
+        langLabel.textContent = "EN";
+        flagSvg.innerHTML = `
+          <rect width="640" height="480" fill="#bf0a30"/>
+          <rect y="37" width="640" height="37" fill="#ffffff"/>
+          <rect y="111" width="640" height="37" fill="#ffffff"/>
+          <rect y="185" width="640" height="37" fill="#ffffff"/>
+          <rect y="259" width="640" height="37" fill="#ffffff"/>
+          <rect y="333" width="640" height="37" fill="#ffffff"/>
+          <rect y="407" width="640" height="37" fill="#ffffff"/>
+          <rect width="260" height="259" fill="#002868"/>
+        `;
+      }
+
+      document.getElementById('lblUrlPrompt').textContent = L.urlPrompt;
+      inputUrl.placeholder = L.placeholder;
+      document.getElementById('lblCurrentStatus').textContent = L.currentStatus;
+      btnPaste.textContent = L.paste;
+      btnStartDownload.textContent = L.startDownload;
+      btnStopDownload.textContent = L.stopDownload;
+      document.getElementById('saveLocationInfo').innerHTML = `${L.saveLocation}<strong id="saveFolderPath">${L.saveFolderDefault}</strong>`;
+      updateSavePathDisplay();
+      
+      if (!isDownloading) {
+        setStatus(L.ready, false);
+        currentTrackTitle.textContent = L.waitingInput;
+      }
+
+      // Update active quote text if visible
+      if (quoteDisplay.style.display !== 'none') {
+        quoteDisplay.textContent = `💬 «${L.quotes[currentQuoteIndex]}»`;
+      }
+    }
+
+    btnToggleLang.addEventListener('click', () => {
+      setLanguage(currentLang === 'ru' ? 'en' : 'ru');
+    });
+
+    /* ==========================================================================
+       QUOTE EASTER EGG (Cycles every 2s, shown only when link is entered)
+       ========================================================================== */
+    function checkQuoteVisibility() {
+      if (inputUrl.value.trim().length > 0 || isDownloading) {
+        quoteDisplay.style.display = 'block';
+        quoteDisplay.textContent = `💬 «${L.quotes[currentQuoteIndex]}»`;
+      } else {
+        quoteDisplay.style.display = 'none';
+      }
+    }
+
+    function startQuoteRotation() {
+      stopQuoteRotation();
+      quoteDisplay.style.display = 'block';
+      quoteDisplay.textContent = `💬 «${L.quotes[currentQuoteIndex]}»`;
+      quoteInterval = setInterval(() => {
+        currentQuoteIndex = (currentQuoteIndex + 1) % L.quotes.length;
+        quoteDisplay.textContent = `💬 «${L.quotes[currentQuoteIndex]}»`;
+      }, 2000);
+    }
+
+    function stopQuoteRotation() {
+      if (quoteInterval) {
+        clearInterval(quoteInterval);
+        quoteInterval = null;
+      }
+    }
+
+    /* ==========================================================================
+       PURE JAVASCRIPT ID3v2.3 ENCODER
+       ========================================================================== */
+    function createId3v23Tag(title, artist, artworkBuffer) {
+      function makeTextFrame(frameId, text) {
+        if (!text) return null;
+        const bytes = [0x01, 0xFF, 0xFE]; // UTF-16 with BOM
+        for (let i = 0; i < text.length; i++) {
+          const code = text.charCodeAt(i);
+          bytes.push(code & 0xFF, (code >> 8) & 0xFF);
+        }
+        const body = new Uint8Array(bytes);
+        const frame = new Uint8Array(10 + body.length);
+        for (let i = 0; i < 4; i++) frame[i] = frameId.charCodeAt(i);
+        const sz = body.length;
+        frame[4] = (sz >> 24) & 0xFF;
+        frame[5] = (sz >> 16) & 0xFF;
+        frame[6] = (sz >> 8) & 0xFF;
+        frame[7] = sz & 0xFF;
+        frame[8] = 0x00;
+        frame[9] = 0x00;
+        frame.set(body, 10);
+        return frame;
+      }
+
+      function makeApicFrame(imgBytes) {
+        if (!imgBytes || imgBytes.length === 0) return null;
+        const mime = "image/jpeg\0";
+        const mimeBytes = [];
+        for (let i = 0; i < mime.length; i++) mimeBytes.push(mime.charCodeAt(i));
+
+        const bodyLen = 1 + mimeBytes.length + 1 + 1 + imgBytes.length;
+        const body = new Uint8Array(bodyLen);
+        let p = 0;
+        body[p++] = 0x00; // ISO-8859-1
+        for (let b of mimeBytes) body[p++] = b;
+        body[p++] = 0x03; // Front Cover
+        body[p++] = 0x00;
+        body.set(imgBytes, p);
+
+        const frame = new Uint8Array(10 + bodyLen);
+        for (let i = 0; i < 4; i++) frame[i] = "APIC".charCodeAt(i);
+        frame[4] = (bodyLen >> 24) & 0xFF;
+        frame[5] = (bodyLen >> 16) & 0xFF;
+        frame[6] = (bodyLen >> 8) & 0xFF;
+        frame[7] = bodyLen & 0xFF;
+        frame[8] = 0x00;
+        frame[9] = 0x00;
+        frame.set(body, 10);
+        return frame;
+      }
+
+      const frames = [];
+      const tit2 = makeTextFrame("TIT2", title);
+      const tpe1 = makeTextFrame("TPE1", artist);
+      if (tit2) frames.push(tit2);
+      if (tpe1) frames.push(tpe1);
+      if (artworkBuffer) {
+        const apic = makeApicFrame(artworkBuffer);
+        if (apic) frames.push(apic);
+      }
+
+      const totalFramesSize = frames.reduce((acc, f) => acc + f.length, 0);
+      const header = new Uint8Array(10);
+      header[0] = 0x49; header[1] = 0x44; header[2] = 0x33; // 'ID3'
+      header[3] = 0x03; header[4] = 0x00; // v2.3
+      header[5] = 0x00;
+      header[6] = (totalFramesSize >> 21) & 0x7F;
+      header[7] = (totalFramesSize >> 14) & 0x7F;
+      header[8] = (totalFramesSize >> 7) & 0x7F;
+      header[9] = totalFramesSize & 0x7F;
+
+      const tag = new Uint8Array(10 + totalFramesSize);
+      tag.set(header, 0);
+      let offset = 10;
+      for (const f of frames) {
+        tag.set(f, offset);
+        offset += f.length;
+      }
+      return tag;
+    }
+
+    function sanitizeFileName(name) {
+      return name.replace(/[<>:"/\\|?*]+/g, '_').trim().replace(/\.+$/, '');
+    }
+
+    function getSafeUrl(url) {
+      if (!url) return url;
+      // In Electron desktop environment, CORS is disabled so direct fetch works
+      if (isElectron) return url;
+      // On web servers (e.g. Cloudflare Pages), route through the serverless function to bypass browser CORS
+      if (window.location.protocol.startsWith('http')) {
+        return `/proxy?url=${encodeURIComponent(url)}`;
+      }
+      return url;
+    }
+
+    /* ==========================================================================
+       AUTOMATIC FILE SAVING
+       ========================================================================== */
+    async function saveBlobFile(blob, fileName) {
+      if (isElectron && typeof require !== 'undefined') {
+        try {
+          const fs = require('fs');
+          const path = require('path');
+          const os = require('os');
+          const downloadsDir = path.join(os.homedir(), 'Downloads');
+          if (!fs.existsSync(downloadsDir)) {
+            fs.mkdirSync(downloadsDir, { recursive: true });
+          }
+          const filePath = path.join(downloadsDir, fileName);
+          const buf = await blob.arrayBuffer();
+          fs.writeFileSync(filePath, Buffer.from(buf));
+          return true;
+        } catch (e) {
+          console.error("Electron save failed, using fallback:", e);
+        }
+      }
+
+      // Browser fallback
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 2000);
+      return true;
+    }
+
+    /* ==========================================================================
+       MAIN DOWNLOAD FLOW
+       ========================================================================== */
+    async function startDownloadFlow() {
+      let targetUrl = inputUrl.value.trim();
+      if (!targetUrl) {
+        alert(L.emptyUrlError);
+        return;
+      }
+
+      if (targetUrl.endsWith('/likes')) {
+        targetUrl = targetUrl.substring(0, targetUrl.length - 6);
+      }
+
+      isDownloading = true;
+      cancelRequested = false;
+      btnStartDownload.disabled = true;
+      btnStopDownload.disabled = false;
+      setStatus(L.resolvingUrl, true);
+      startQuoteRotation();
+
+      try {
+        const resolveApi = `https://api-v2.soundcloud.com/resolve?url=${encodeURIComponent(targetUrl)}&client_id=${clientId}`;
+        const resp = await fetch(getSafeUrl(resolveApi));
+        if (!resp.ok) throw new Error(`${resp.status}`);
+        
+        const data = await resp.json();
+        const kind = data.kind;
+
+        let trackQueue = [];
+
+        if (kind === 'track') {
+          trackQueue = [data];
+        } else if (kind === 'playlist') {
+          const tracksElement = data.tracks || [];
+          const trackIdsToFetch = [];
+
+          for (const item of tracksElement) {
+            if (item.media && item.media.transcodings) {
+              trackQueue.push(item);
+            } else if (item.id) {
+              trackIdsToFetch.push(item.id);
+            }
+          }
+
+          if (trackIdsToFetch.length > 0) {
+            for (let i = 0; i < trackIdsToFetch.length; i += 50) {
+              const batch = trackIdsToFetch.slice(i, i + 50);
+              const batchUrl = `https://api-v2.soundcloud.com/tracks?ids=${batch.join('%2C')}&client_id=${clientId}`;
+              const bResp = await fetch(getSafeUrl(batchUrl));
+              if (bResp.ok) {
+                const bTracks = await bResp.json();
+                trackQueue.push(...bTracks);
+              }
+            }
+          }
+        } else if (kind === 'user') {
+          const userId = data.id;
+          let likesUrl = `https://api-v2.soundcloud.com/users/${userId}/likes?client_id=${clientId}&limit=100`;
+
+          while (likesUrl && !cancelRequested) {
+            const lResp = await fetch(getSafeUrl(likesUrl));
+            if (!lResp.ok) break;
+            const lData = await lResp.json();
+            
+            for (const item of (lData.collection || [])) {
+              if (item.track && item.track.media && item.track.media.transcodings) {
+                trackQueue.push(item.track);
+              }
+            }
+
+            if (lData.next_href) {
+              likesUrl = lData.next_href;
+              if (!likesUrl.includes('client_id=')) likesUrl += `&client_id=${clientId}`;
+            } else {
+              likesUrl = null;
+            }
+          }
+        } else {
+          alert(L.invalidUrlError);
+          return;
+        }
+
+        if (trackQueue.length === 0) {
+          alert(L.noTracksFound);
+          return;
+        }
+
+        // Process tracks
+        const total = trackQueue.length;
+        let completed = 0;
+
+        for (let i = 0; i < total; i++) {
+          if (cancelRequested) break;
+          downloadCounterStats.textContent = `${L.trackPrefix} ${i + 1} ${L.fromWord} ${total}`;
+          setStatus(`${L.downloading} (${i + 1}/${total})`, true);
+          
+          const success = await downloadTrack(trackQueue[i], i + 1, total);
+          if (success) completed++;
+        }
+
+        setStatus(`${L.finished} (${completed}/${total})`, false);
+
+      } catch (err) {
+        if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError') || err.name === 'TypeError')) {
+          const msg = currentLang === 'ru'
+            ? "Ошибка браузера: Запрос заблокирован защитой CORS.\n\nОбычные браузеры блокируют прямые запросы к закрытым API.\n\nКак запустить:\n1. В терминале запустите браузер с отключенным CORS:\nmsedge.exe --disable-web-security --user-data-dir=\"%TEMP%\\sc_session\" \"" + window.location.href + "\"\n\n2. Либо установите расширение для браузера: «Allow CORS» / «CORS Unblock»."
+            : "Browser Error: Request blocked by CORS security policy.\n\nStandard browsers block direct cross-origin requests to private APIs.\n\nHow to run:\n1. In terminal run your browser with disabled CORS:\nmsedge.exe --disable-web-security --user-data-dir=\"%TEMP%\\sc_session\" \"" + window.location.href + "\"\n\n2. Or install a browser extension: 'Allow CORS' / 'CORS Unblock'.";
+          alert(msg);
+        } else {
+          alert(err.message);
+        }
+      } finally {
+        isDownloading = false;
+        btnStartDownload.disabled = false;
+        btnStopDownload.disabled = true;
+        setStatus(L.ready, false);
+        stopQuoteRotation();
+        checkQuoteVisibility();
+      }
+    }
+
+    /* ==========================================================================
+       DOWNLOAD INDIVIDUAL TRACK & EMBED TAGS AUTOMATICALLY
+       ========================================================================== */
+    async function downloadTrack(track, index, total) {
+      const title = track.title || 'Без названия';
+      const artist = track.user ? (track.user.username || 'Неизвестный исполнитель') : 'Артист';
+      const artwork = track.artwork_url || (track.user ? track.user.avatar_url : null);
+
+      currentTrackTitle.textContent = title;
+      currentTrackArtist.textContent = artist;
+
+      if (artwork) {
+        const hiResArtwork = artwork.replace('-large', '-t500x500');
+        albumArtImg.src = hiResArtwork;
+        albumArtImg.style.display = 'block';
+        albumArtIcon.style.display = 'none';
+      } else {
+        albumArtImg.style.display = 'none';
+        albumArtIcon.style.display = 'block';
+      }
+
+      try {
+        const transcodings = track.media && track.media.transcodings ? track.media.transcodings : [];
+        const progressive = transcodings.find(t => t.format && t.format.protocol === 'progressive');
+        const hls = transcodings.find(t => t.format && t.format.protocol === 'hls');
+        const selectedTranscoding = progressive || hls;
+
+        if (!selectedTranscoding) return false;
+
+        let streamInfoUrl = `${selectedTranscoding.url}?client_id=${clientId}`;
+        if (track.track_authorization) {
+          streamInfoUrl += `&track_authorization=${encodeURIComponent(track.track_authorization)}`;
+        }
+
+        const streamInfoResp = await fetch(getSafeUrl(streamInfoUrl));
+        if (!streamInfoResp.ok) return false;
+        const streamInfoJson = await streamInfoResp.json();
+        const audioCdnUrl = streamInfoJson.url;
+
+        const audioResp = await fetch(getSafeUrl(audioCdnUrl));
+        if (!audioResp.ok) return false;
+
+        const contentLength = +audioResp.headers.get('Content-Length') || 0;
+        const reader = audioResp.body.getReader();
+        let receivedBytes = 0;
+        const chunks = [];
+        const startTime = Date.now();
+
+        while (true) {
+          if (cancelRequested) {
+            reader.cancel();
+            return false;
+          }
+
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          chunks.push(value);
+          receivedBytes += value.length;
+
+          let percent = contentLength > 0 ? (receivedBytes / contentLength * 100) : 0;
+          trackProgressFill.style.width = `${Math.min(100, percent)}%`;
+          trackProgressText.textContent = `${percent.toFixed(1)}%`;
+
+          const curMb = (receivedBytes / 1024 / 1024).toFixed(2);
+          const totalMb = contentLength > 0 ? (contentLength / 1024 / 1024).toFixed(2) : '?';
+          downloadSizeStats.textContent = `${curMb} / ${totalMb} MB`;
+
+          const elapsedSec = (Date.now() - startTime) / 1000;
+          if (elapsedSec > 0) {
+            const kbSec = ((receivedBytes / 1024) / elapsedSec).toFixed(0);
+            downloadSpeedStats.textContent = `${kbSec} KB/s`;
+          }
+        }
+
+        const audioBuffer = new Uint8Array(receivedBytes);
+        let offset = 0;
+        for (const chunk of chunks) {
+          audioBuffer.set(chunk, offset);
+          offset += chunk.length;
+        }
+
+        // Always download high-resolution cover art (500x500)
+        let artworkBuffer = null;
+        if (artwork) {
+          try {
+            const hiResCover = artwork.replace('-large', '-t500x500');
+            const coverResp = await fetch(getSafeUrl(hiResCover));
+            if (coverResp.ok) {
+              artworkBuffer = new Uint8Array(await coverResp.arrayBuffer());
+            }
+          } catch (e) {}
+        }
+
+        // Always embed ID3v2.3 tags and cover art
+        const id3Tag = createId3v23Tag(title, artist, artworkBuffer);
+        const combined = new Uint8Array(id3Tag.length + audioBuffer.length);
+        combined.set(id3Tag, 0);
+        combined.set(audioBuffer, id3Tag.length);
+        const finalBlob = new Blob([combined], { type: 'audio/mpeg' });
+
+        const fileName = sanitizeFileName(`${artist} - ${title}.mp3`);
+        await saveBlobFile(finalBlob, fileName);
+
+        trackProgressFill.style.width = '100%';
+        trackProgressText.textContent = '100%';
+        return true;
+
+      } catch (err) {
+        return false;
+      }
+    }
+
+    /* ==========================================================================
+       EVENT LISTENERS
+       ========================================================================== */
+    btnPaste.addEventListener('click', async () => {
+      try {
+        const text = await navigator.clipboard.readText();
+        inputUrl.value = text;
+        checkQuoteVisibility();
+      } catch (err) {
+        inputUrl.focus();
+      }
+    });
+
+    inputUrl.addEventListener('input', () => {
+      checkQuoteVisibility();
+    });
+
+    btnStartDownload.addEventListener('click', () => {
+      startDownloadFlow();
+    });
+
+    btnStopDownload.addEventListener('click', () => {
+      cancelRequested = true;
+      btnStopDownload.disabled = true;
+    });
+
+    inputUrl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        startDownloadFlow();
+      }
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      setLanguage('en');
+      updateSavePathDisplay();
+      checkQuoteVisibility();
+    });
+  </script>
+</body>
+</html>

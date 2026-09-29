@@ -1,0 +1,66 @@
+{
+  "name": "magnitola",
+  "version": "1.0.0",
+  "description": "Retro Music & Metadata Downloader with ID3v2.3 tagging",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable",
+    "build:win": "electron-builder --win portable",
+    "build:linux": "electron-builder --linux AppImage",
+    "build:mac": "electron-builder --mac dmg zip",
+    "build:all": "electron-builder -wlm"
+  },
+  "keywords": [
+    "music",
+    "downloader",
+    "mp3",
+    "electron",
+    "retro"
+  ],
+  "author": "MAGNITOLA Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.magnitola.downloader",
+    "productName": "MAGNITOLA",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ],
+      "icon": "icon.ico"
+    },
+    "portable": {
+      "artifactName": "MAGNITOLA-Windows.exe"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "artifactName": "MAGNITOLA-Linux.AppImage",
+      "icon": "magnitolalogo.png",
+      "category": "Audio"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "artifactName": "MAGNITOLA-macOS.dmg",
+      "icon": "magnitolalogo.png",
+      "category": "public.app-category.music"
+    },
+    "files": [
+      "index.html",
+      "main.js",
+      "magnitolalogo.png",
+      "synclinelogo.png",
+      "icon.ico"
+    ]
+  }
+}
