@@ -1,45 +1,21 @@
 # MAGNITOLA
 
-CLI tool for downloading tracks, playlists, and user likes from SoundCloud with ID3 tags and artwork.
+CLI tool for downloading music from SoundCloud in M4A (AAC 160 kbps). Tags title, artist, and embeds artwork.
 
 ## Requirements
-
-- .NET 10 SDK
+- .NET 10 SDK 
 
 ## Usage
-
-Interactive mode:
 ```bash
 dotnet run
 ```
 
-Direct download via link:
-```bash
-dotnet run -- "https://soundcloud.com/artist/track-name"
-```
-
-Files are saved to the system `Downloads` folder.
-
----
-
-# MAGNITOLA
-
-Консольная утилита для скачивания треков, плейлистов и лайков с SoundCloud с ID3-тегами и обложками.
+Консольная программа для скачивания музыки с SoundCloud в M4A (AAC 160 kbps). Вшивает название, автора и обложку.
 
 ## Требования
+- .NET 10 SDK 
 
-- .NET 10 SDK
-
-## Использование
-
-Интерактивный режим:
+## Запуск
 ```bash
 dotnet run
 ```
-
-Скачивание напрямую по ссылке:
-```bash
-dotnet run -- "https://soundcloud.com/artist/track-name"
-```
-
-Файлы сохраняются в системную папку «Загрузки».

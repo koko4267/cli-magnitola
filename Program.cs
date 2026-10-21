@@ -5,96 +5,150 @@ using TagLib;
 
 namespace SoundCloudDownloader;
 
-/// <summary>
-/// Главный класс консольного загрузчика треков, плейлистов и лайков с SoundCloud.
-/// </summary>
+// Главный класс программы.
 public class Program
 {
-    // Единственный переиспользуемый HTTP-клиент с таймаутом 30с и User-Agent браузера (для обхода базовой защиты от ботов).
-    private static readonly HttpClient httpClient = new()
-    {
-        Timeout = TimeSpan.FromSeconds(30),
-        DefaultRequestHeaders =
-        {
-            { "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36" }
-        }
-    };
+    // Один клиент на всю программу. Таймаут 30 сек, маскируемся под браузер.
+    public static HttpClient httpClient = CreateHttpClient();
 
-    // Настройки JSON: регистронезависимое сопоставление свойств DTO (SoundCloud использует snake_case и camelCase).
+    // Создаем HTTP-клиент. Можно передать обработчик для тестов.
+    public static HttpClient CreateHttpClient(HttpMessageHandler? handler = null)
+    {
+        var client = handler != null ? new HttpClient(handler) : new HttpClient();
+        client.Timeout = TimeSpan.FromSeconds(30);
+        client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+        return client;
+    }
+
+    // Игнорируем регистр букв в названиях полей JSON.
     internal static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    // Флаг языка интерфейса: по умолчанию определяется язык текущей локали системы (русский или английский).
+    // Язык: true — русский, false — английский.
     internal static bool IsRu = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.Equals("ru", StringComparison.OrdinalIgnoreCase);
 
-    // Кэш Client ID: получается один раз за время жизни процесса и повторно используется для всех запросов к API.
-    private static string? _cachedClientId;
+    // Кэш для client_id (ключа от API).
+    public static string? _cachedClientId;
 
-    /// <summary>
-    /// Возвращает строку на выбранном языке (RU/EN).
-    /// </summary>
+    // Запасной ключ на случай, если сайт не отдал свежий.
+    internal const string FallbackClientId = "bQmaW4vAHmJIUxisgjRG4MAWAiDgsk9D";
+
+    // Имена, которые Windows не разрешает давать файлам.
+    private static readonly HashSet<string> WindowsReservedNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    };
+
+    // Выбор строки под текущий язык (RU/EN).
     internal static string L(string ru, string en) => IsRu ? ru : en;
 
-    static async Task Main(string[] args)
+    static async Task<int> Main(string[] args)
     {
-        // Устанавливаем UTF-8 в консоли для корректного отображения кириллицы, спецсимволов и emoji.
+        // Включаем UTF-8, чтобы русский текст и спецсимволы не ломались.
         Console.OutputEncoding = System.Text.Encoding.UTF8;
+        Console.InputEncoding = System.Text.Encoding.UTF8;
 
-        // Если ссылка была передана первым аргументом командной строки: dotnet run -- "<url>"
-        string initialArgUrl = args.Length > 0 ? args[0] : string.Empty;
-
-        // Если запущено без аргументов — предлагаем пользователю выбрать язык интерфейса.
-        if (string.IsNullOrWhiteSpace(initialArgUrl))
+        // Если попросили справку (--help / -h / /?)
+        if (args.Length > 0 && args[0] is "--help" or "-h" or "/?" or "help")
         {
-            Console.WriteLine("Select language / Выберите язык:");
-            Console.WriteLine("  1. Русский (RU)" + (IsRu ? " [по умолчанию]" : ""));
-            Console.WriteLine("  2. English (EN)" + (!IsRu ? " [default]" : ""));
-            Console.Write("Choice / Выбор [1/2]: ");
-            string? langChoice = Console.ReadLine()?.Trim();
-            if (langChoice is "2" or "en" or "EN" or "english" or "English")
-            {
-                IsRu = false;
-            }
-            else if (langChoice is "1" or "ru" or "RU" or "russian" or "Russian")
-            {
-                IsRu = true;
-            }
-            Console.WriteLine();
+            PrintHelp();
+            return 0;
         }
 
+        // Если ссылку передали аргументом: dotnet run -- "<ссылка>"
+        if (args.Length > 0 && !string.IsNullOrWhiteSpace(args[0]))
+        {
+            bool success = await DownloadFromUrlAsync(args[0]);
+            return success ? 0 : 1;
+        }
+
+        // Иначе запускаем обычное интерактивное меню.
+        SelectLanguage();
+        return await RunInteractiveLoopAsync();
+    }
+
+    // Показывает справку.
+    private static void PrintHelp()
+    {
+        Console.WriteLine(L(
+            "MAGNITOLA — консольный загрузчик музыки с SoundCloud\n\n" +
+            "Использование:\n" +
+            "  dotnet run                      Интерактивный режим\n" +
+            "  dotnet run -- \"<ссылка>\"         Прямое скачивание по ссылке\n" +
+            "  dotnet run -- --help            Показать эту справку\n\n" +
+            "Поддерживаемые ссылки:\n" +
+            "  • Трек:      https://soundcloud.com/artist/track-name\n" +
+            "  • Плейлист:  https://soundcloud.com/artist/sets/playlist-name\n" +
+            "  • Лайки:     https://soundcloud.com/username (или /likes)\n" +
+            "  • Короткие:  https://on.soundcloud.com/xxxx\n\n" +
+            "Файлы сохраняются в папку «Загрузки» (Downloads).",
+
+            "MAGNITOLA — SoundCloud music downloader CLI\n\n" +
+            "Usage:\n" +
+            "  dotnet run                      Interactive mode\n" +
+            "  dotnet run -- \"<url>\"            Direct download by URL\n" +
+            "  dotnet run -- --help            Show this help message\n\n" +
+            "Supported links:\n" +
+            "  • Track:     https://soundcloud.com/artist/track-name\n" +
+            "  • Playlist:  https://soundcloud.com/artist/sets/playlist-name\n" +
+            "  • Likes:     https://soundcloud.com/username (or /likes)\n" +
+            "  • Shortlink: https://on.soundcloud.com/xxxx\n\n" +
+            "Files are saved to your system Downloads folder."
+        ));
+    }
+
+    // Меню выбора языка.
+    private static void SelectLanguage()
+    {
+        Console.WriteLine("Select language / Выберите язык:");
+        Console.WriteLine("  1. Русский (RU)" + (IsRu ? " [по умолчанию]" : ""));
+        Console.WriteLine("  2. English (EN)" + (!IsRu ? " [default]" : ""));
+        Console.Write("Choice / Выбор [1/2]: ");
+        string? langChoice = Console.ReadLine()?.Trim();
+        if (langChoice is "2" or "en" or "EN" or "english" or "English")
+        {
+            IsRu = false;
+        }
+        else if (langChoice is "1" or "ru" or "RU" or "russian" or "Russian")
+        {
+            IsRu = true;
+        }
+        Console.WriteLine();
+    }
+
+    // Рисует шапку программы.
+    private static void PrintBanner(string downloadFolder)
+    {
+        Console.WriteLine(new string('=', 70));
+        Console.WriteLine("                              MAGNITOLA                               ");
+        Console.WriteLine(new string('=', 70));
+        Console.WriteLine();
+        Console.WriteLine(L("Краткое руководство:", "Quick Guide:"));
+        Console.WriteLine(L("  • Скачивание одного трека:  вставьте ссылку на трек", "  • Single track:    paste track link"));
+        Console.WriteLine(L("  • Скачивание плейлиста:     вставьте ссылку на плейлист или альбом", "  • Playlist/Album:  paste playlist or album link"));
+        Console.WriteLine(L("  • Скачивание всех лайков:   вставьте ссылку на профиль пользователя", "  • All user likes:  paste user profile link"));
+        Console.WriteLine();
+        Console.WriteLine(L("Музыка сохраняется в папку «Загрузки»:", "Music is downloaded to the \"Downloads\" folder:"));
+        Console.WriteLine($"  {downloadFolder}");
+        Console.WriteLine(new string('=', 70));
+        Console.WriteLine();
+    }
+
+    // Главный цикл: спрашивает ссылку, качает, потом спрашивает еще.
+    private static async Task<int> RunInteractiveLoopAsync()
+    {
         string downloadFolder = GetDownloadsDirectory();
 
-        // Главный интерактивный цикл программы.
         while (true)
         {
-            Console.WriteLine(new string('=', 70));
-            Console.WriteLine("                              MAGNITOLA                               ");
-            Console.WriteLine(new string('=', 70));
-            Console.WriteLine();
-            Console.WriteLine(L("Краткое руководство:", "Quick Guide:"));
-            Console.WriteLine(L("  • Скачивание одного трека:  вставьте ссылку на трек", "  • Single track:    paste track link"));
-            Console.WriteLine(L("  • Скачивание плейлиста:     вставьте ссылку на плейлист или альбом", "  • Playlist/Album:  paste playlist or album link"));
-            Console.WriteLine(L("  • Скачивание всех лайков:   вставьте ссылку на профиль пользователя", "  • All user likes:  paste user profile link"));
-            Console.WriteLine();
-            Console.WriteLine(L("Музыка сохраняется в папку «Загрузки»:", "Music is downloaded to the \"Downloads\" folder:"));
-            Console.WriteLine($"  {downloadFolder}");
-            Console.WriteLine(new string('=', 70));
-            Console.WriteLine();
+            PrintBanner(downloadFolder);
 
-            // Считывание ссылки: из аргумента при первом запуске либо из ввода пользователя.
-            string trackUrl;
-            if (!string.IsNullOrWhiteSpace(initialArgUrl))
-            {
-                trackUrl = initialArgUrl;
-                initialArgUrl = string.Empty; // Сбрасываем аргумент, чтобы при следующем круге запросить ввод.
-                Console.WriteLine(L($"Введите ссылку на трек, плейлист или пользователя SoundCloud: {trackUrl}",
-                                    $"Enter SoundCloud track, playlist, or user profile link: {trackUrl}"));
-            }
-            else
-            {
-                Console.Write(L("Введите ссылку на трек, плейлист или пользователя SoundCloud: ",
-                                "Enter SoundCloud track, playlist, or user profile link: "));
-                trackUrl = Console.ReadLine()?.Trim() ?? string.Empty;
-            }
+            Console.Write(L("Введите ссылку на трек, плейлист или пользователя SoundCloud: ",
+                            "Enter SoundCloud track, playlist, or user profile link: "));
+            string? rawUrl = Console.ReadLine();
+            if (rawUrl == null) break; // Если ввод закрылся (EOF) — выходим
+            string trackUrl = rawUrl.Trim();
 
             if (string.IsNullOrWhiteSpace(trackUrl))
             {
@@ -102,104 +156,19 @@ public class Program
             }
             else
             {
-                try
-                {
-                    // Шаг 1: Получение действующего Client ID для запросов к закрытому v2 API.
-                    Console.WriteLine(L("1. Получение Client ID...", "1. Fetching Client ID..."));
-                    string clientId = await GetClientIdAsync();
-                    Console.WriteLine($"   Client ID: {clientId}");
-
-                    // Нормализация ссылки (удаление завершающего /likes, концевых слешей).
-                    trackUrl = NormalizeSoundCloudUrl(trackUrl);
-
-                    // Шаг 2: Обращение к /resolve эндпоинту API для определения типа объекта по веб-ссылке.
-                    Console.WriteLine(L("2. Получение информации по ссылке...", "2. Resolving URL..."));
-                    string resolveUrl = $"https://api-v2.soundcloud.com/resolve?url={Uri.EscapeDataString(trackUrl)}&client_id={clientId}";
-                    string json = await httpClient.GetStringAsync(resolveUrl);
-                    using var doc = JsonDocument.Parse(json);
-
-                    // Свойство "kind" указывает на тип сущности: user, playlist или track.
-                    string kind = doc.RootElement.GetProperty("kind").GetString() ?? string.Empty;
-                    var failedTracks = new List<SoundCloudTrack>();
-
-                    // 1. Профиль пользователя -> скачиваем все лайки (понравившиеся треки).
-                    if (kind == "user")
-                    {
-                        long userId = doc.RootElement.GetProperty("id").GetInt64();
-                        string username = doc.RootElement.TryGetProperty("username", out var u) && u.GetString() is { Length: > 0 } name
-                            ? name
-                            : L("Неизвестный пользователь", "Unknown user");
-
-                        // Попытка извлечь общее количество лайков для отображения счетчика [x/y].
-                        int totalLikes = 0;
-                        if (doc.RootElement.TryGetProperty("public_favorites_count", out var fav) && fav.ValueKind == JsonValueKind.Number)
-                        {
-                            totalLikes = fav.GetInt32();
-                        }
-                        else if (doc.RootElement.TryGetProperty("likes_count", out var likes) && likes.ValueKind == JsonValueKind.Number)
-                        {
-                            totalLikes = likes.GetInt32();
-                        }
-
-                        string countInfo = totalLikes > 0 ? L($" (всего ~{totalLikes})", $" (total ~{totalLikes})") : string.Empty;
-                        Console.WriteLine(L($"   Пользователь: {username}{countInfo}. Загрузка понравившихся треков (лайков)...",
-                                            $"   User: {username}{countInfo}. Downloading liked tracks..."));
-                        failedTracks = await DownloadLikesAsync(userId, clientId, totalLikes);
-                    }
-                    // 2. Плейлист или альбом -> скачиваем все включенные треки.
-                    else if (kind == "playlist")
-                    {
-                        string title = doc.RootElement.TryGetProperty("title", out var t) && t.GetString() is { Length: > 0 } playlistTitle
-                            ? playlistTitle
-                            : L("Плейлист", "Playlist");
-
-                        Console.WriteLine(L($"   Плейлист: {title}. Загрузка треков плейлиста...",
-                                            $"   Playlist: {title}. Downloading playlist tracks..."));
-                        failedTracks = await DownloadPlaylistAsync(doc.RootElement, clientId);
-                    }
-                    // 3. Отдельный трек -> прямое скачивание.
-                    else if (kind == "track")
-                    {
-                        var track = doc.RootElement.Deserialize<SoundCloudTrack>(JsonOptions);
-                        if (track != null)
-                        {
-                            bool success = await ProcessTrackAsync(track, clientId, 1, 1);
-                            if (!success) failedTracks.Add(track);
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine(L($"Неподдерживаемый тип ссылки: {kind}. Поддерживаются треки, плейлисты и профили пользователей.",
-                                            $"Unsupported link type: {kind}. Supported: tracks, playlists, and user profiles."));
-                    }
-
-                    // Если какие-либо треки не удалось скачать (сбой сети, таймаут) — предлагаем повтор.
-                    if (failedTracks.Count > 0)
-                    {
-                        await RetryFailedTracksAsync(failedTracks, clientId);
-                    }
-
-                    Console.WriteLine();
-                    Console.WriteLine(new string('=', 70));
-                    Console.WriteLine(L($"Загрузка завершена! Файлы сохранены в: {downloadFolder}",
-                                        $"Download finished! Files saved to: {downloadFolder}"));
-                    Console.WriteLine(new string('=', 70));
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(L($"\n[Ошибка]: {ex.Message}", $"\n[Error]: {ex.Message}"));
-                }
+                await DownloadFromUrlAsync(trackUrl);
             }
 
-            // Запрос дальнейших действий у пользователя.
             Console.WriteLine();
             Console.WriteLine(L("Что вы хотите сделать дальше?", "What would you like to do next?"));
             Console.WriteLine(L("  1. Скачать ещё (продолжить)", "  1. Download more (continue)"));
             Console.WriteLine(L("  2. Выйти из программы", "  2. Exit program"));
             Console.Write(L("Выберите действие [1/2] (по умолчанию: 1): ", "Choose an option [1/2] (Default: 1): "));
-            string? choice = Console.ReadLine()?.Trim();
 
-            // Завершаем цикл, если пользователь выбрал пункт 2 или ввел команду выхода.
+            string? rawChoice = Console.ReadLine();
+            if (rawChoice == null) break; // Если ввод закрылся — выходим
+            string? choice = rawChoice.Trim();
+
             if (choice is "2" or "q" or "quit" or "exit" or "n" or "no" or "нет" or "н")
             {
                 Console.WriteLine();
@@ -209,33 +178,233 @@ public class Program
 
             Console.WriteLine();
         }
+
+        return 0;
     }
 
-    /// <summary>
-    /// Нормализует URL SoundCloud. Если пользователь передал ссылку на вкладку /likes (напр. soundcloud.com/user/likes),
-    /// обрезает /likes, так как эндпоинт /resolve ожидает базовый URL профиля.
-    /// </summary>
-    internal static string NormalizeSoundCloudUrl(string url)
+    // Скачивает трек, плейлист или лайки по ссылке.
+    private static async Task<bool> DownloadFromUrlAsync(string rawUrl)
     {
-        url = url.Trim().TrimEnd('/');
-        if (url.EndsWith("/likes", StringComparison.OrdinalIgnoreCase))
+        string downloadFolder = GetDownloadsDirectory();
+        try
         {
-            url = url[..^6].TrimEnd('/');
+            // 1. Получаем ключ client_id.
+            Console.WriteLine(L("1. Получение Client ID...", "1. Fetching Client ID..."));
+            await GetClientIdAsync();
+
+            // 2. Чистим ссылку от лишнего и разворачиваем короткие ссылки.
+            string trackUrl = await NormalizeSoundCloudUrlAsync(rawUrl);
+
+            // 3. Узнаем через API, что за ссылка.
+            Console.WriteLine(L("2. Получение информации по ссылке...", "2. Resolving URL..."));
+            var (success, failedTracks) = await ResolveAndDownloadAsync(trackUrl);
+
+            // Если что-то упало — предлагаем попробовать еще раз.
+            if (failedTracks.Count > 0)
+            {
+                await RetryFailedTracksAsync(failedTracks);
+            }
+
+            Console.WriteLine();
+            Console.WriteLine(new string('=', 70));
+            Console.WriteLine(L($"Загрузка завершена! Файлы сохранены в: {downloadFolder}",
+                                $"Download finished! Files saved to: {downloadFolder}"));
+            Console.WriteLine(new string('=', 70));
+            return success && failedTracks.Count == 0;
         }
-        return url;
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            Console.WriteLine(L("\n[Ошибка]: Объект не найден по указанной ссылке SoundCloud.",
+                                "\n[Error]: Object not found at the provided SoundCloud URL."));
+            return false;
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Console.WriteLine(L("\n[Ошибка]: Ошибка авторизации API (Client ID устарел или был заблокирован).",
+                                "\n[Error]: API authorization failed (Client ID expired or was blocked)."));
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(L($"\n[Ошибка]: {ex.Message}", $"\n[Error]: {ex.Message}"));
+            return false;
+        }
     }
 
-    /// <summary>
-    /// Предлагает пользователю повторить попытку скачивания для треков, завершившихся ошибкой.
-    /// </summary>
-    private static async Task RetryFailedTracksAsync(List<SoundCloudTrack> failedTracks, string clientId)
+    // Узнает через API SoundCloud, что по ссылке, и качает нужное.
+    public static async Task<(bool Success, List<SoundCloudTrack> FailedTracks)> ResolveAndDownloadAsync(string trackUrl)
+    {
+        string resolveUrl = $"https://api-v2.soundcloud.com/resolve?url={Uri.EscapeDataString(trackUrl)}";
+        string json = await ApiGetStringAsync(resolveUrl);
+        using var doc = JsonDocument.Parse(json);
+
+        string kind = doc.RootElement.GetProperty("kind").GetString() ?? string.Empty;
+        var failedTracks = new List<SoundCloudTrack>();
+
+        // 1. Профиль автора -> качаем все его лайки.
+        if (kind == "user")
+        {
+            long userId = doc.RootElement.GetProperty("id").GetInt64();
+            string username = doc.RootElement.TryGetProperty("username", out var u) && u.GetString() is { Length: > 0 } name
+                ? name
+                : L("Неизвестный пользователь", "Unknown user");
+
+            int totalLikes = 0;
+            if (doc.RootElement.TryGetProperty("public_favorites_count", out var fav) && fav.ValueKind == JsonValueKind.Number)
+            {
+                totalLikes = fav.GetInt32();
+            }
+            else if (doc.RootElement.TryGetProperty("likes_count", out var likes) && likes.ValueKind == JsonValueKind.Number)
+            {
+                totalLikes = likes.GetInt32();
+            }
+
+            string countInfo = totalLikes > 0 ? L($" (всего ~{totalLikes})", $" (total ~{totalLikes})") : string.Empty;
+            Console.WriteLine(L($"   Пользователь: {username}{countInfo}. Загрузка понравившихся треков (лайков)...",
+                                $"   User: {username}{countInfo}. Downloading liked tracks..."));
+            var (completed, likesFailures) = await DownloadLikesAsync(userId, totalLikes);
+            return (completed, likesFailures);
+        }
+
+        // 2. Плейлист или альбом -> качаем все песни из него.
+        if (kind == "playlist")
+        {
+            string title = doc.RootElement.TryGetProperty("title", out var t) && t.GetString() is { Length: > 0 } playlistTitle
+                ? playlistTitle
+                : L("Плейлист", "Playlist");
+
+            Console.WriteLine(L($"   Плейлист: {title}. Загрузка треков плейлиста...",
+                                $"   Playlist: {title}. Downloading playlist tracks..."));
+            failedTracks = await DownloadPlaylistAsync(doc.RootElement);
+            return (true, failedTracks);
+        }
+
+        // 3. Одиночный трек -> просто качаем его.
+        if (kind == "track")
+        {
+            var track = doc.RootElement.Deserialize<SoundCloudTrack>(JsonOptions);
+            if (track != null)
+            {
+                bool success = await ProcessTrackAsync(track, 1, 1);
+                if (!success) failedTracks.Add(track);
+                return (success, failedTracks);
+            }
+            return (false, failedTracks);
+        }
+
+        Console.WriteLine(L($"Неподдерживаемый тип ссылки: {kind}. Поддерживаются треки, плейлисты и профили пользователей.",
+                            $"Unsupported link type: {kind}. Supported: tracks, playlists, and user profiles."));
+        return (false, failedTracks);
+    }
+
+    // GET-запрос к API. Сам подставляет client_id в URL.
+    public static async Task<string> ApiGetStringAsync(string url)
+    {
+        return await ApiGetStringAsync(clientId =>
+        {
+            if (Regex.IsMatch(url, @"([?&])client_id=[^&]*"))
+            {
+                return Regex.Replace(url, @"([?&])client_id=[^&]*", $"$1client_id={clientId}");
+            }
+            return url.Contains('?') ? $"{url}&client_id={clientId}" : $"{url}?client_id={clientId}";
+        });
+    }
+
+    // GET-запрос к API. Если словили 401 (ключ протух) — берет свежий ключ и пробует еще 1 раз.
+    public static async Task<string> ApiGetStringAsync(Func<string, string> urlFactory)
+    {
+        string clientId = await GetClientIdAsync();
+        string url = urlFactory(clientId);
+        try
+        {
+            return await httpClient.GetStringAsync(url);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            // Сбрасываем старый ключ и ищем свежий
+            _cachedClientId = null;
+            string newClientId;
+            try
+            {
+                newClientId = await GetClientIdAsync(forceRefresh: true);
+            }
+            catch (Exception refreshEx)
+            {
+                throw new HttpRequestException(
+                    L($"Не удалось обновить Client ID: {refreshEx.Message}", $"Failed to refresh Client ID: {refreshEx.Message}"),
+                    ex,
+                    System.Net.HttpStatusCode.Unauthorized
+                );
+            }
+
+            // Повторяем запрос со свежим ключом ровно 1 раз
+            string retryUrl = urlFactory(newClientId);
+            return await httpClient.GetStringAsync(retryUrl);
+        }
+    }
+
+    // Приводит ссылку в порядок: разворачивает короткие ссылки и убирает хвосты.
+    internal static async Task<string> NormalizeSoundCloudUrlAsync(string url)
+    {
+        url = url.Trim();
+        if (string.IsNullOrWhiteSpace(url)) return url;
+
+        // Если ссылка короткая (on.soundcloud.com) — узнаем полный адрес
+        if (url.Contains("on.soundcloud.com", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                using var req = new HttpRequestMessage(HttpMethod.Get, url);
+                using var res = await httpClient.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
+                if (res.RequestMessage?.RequestUri != null)
+                {
+                    url = res.RequestMessage.RequestUri.ToString();
+                }
+            }
+            catch { }
+        }
+
+        // Мобильный soundcloud меняем на обычный
+        if (url.StartsWith("https://m.soundcloud.com", StringComparison.OrdinalIgnoreCase))
+        {
+            url = "https://soundcloud.com" + url["https://m.soundcloud.com".Length..];
+        }
+        else if (url.StartsWith("http://m.soundcloud.com", StringComparison.OrdinalIgnoreCase))
+        {
+            url = "https://soundcloud.com" + url["http://m.soundcloud.com".Length..];
+        }
+
+        // Отрезаем ?si=... и прочий хвост
+        string pathAndDomain = url;
+        string query = string.Empty;
+        int queryIdx = url.IndexOf('?');
+        if (queryIdx >= 0)
+        {
+            pathAndDomain = url[..queryIdx];
+            query = url[queryIdx..];
+        }
+
+        pathAndDomain = pathAndDomain.TrimEnd('/');
+        if (pathAndDomain.EndsWith("/likes", StringComparison.OrdinalIgnoreCase))
+        {
+            pathAndDomain = pathAndDomain[..^6].TrimEnd('/');
+            return pathAndDomain;
+        }
+
+        return pathAndDomain + query;
+    }
+
+    // Спрашивает пользователя, надо ли перекачать упавшие треки.
+    private static async Task RetryFailedTracksAsync(List<SoundCloudTrack> failedTracks)
     {
         while (failedTracks.Count > 0)
         {
             Console.WriteLine();
             Console.WriteLine(L($"Не удалось скачать треков: {failedTracks.Count}", $"Failed to download {failedTracks.Count} track(s)."));
             Console.Write(L("Попробовать скачать неудавшиеся треки снова? [Y/n] (по умолчанию: Да): ", "Retry downloading failed tracks? [Y/n] (default: Yes): "));
-            string? input = Console.ReadLine()?.Trim();
+            string? raw = Console.ReadLine();
+            if (raw == null) break; // Если ввод закрылся — выходим
+            string input = raw.Trim();
             if (input is "n" or "no" or "н" or "нет") break;
 
             Console.WriteLine();
@@ -243,20 +412,51 @@ public class Program
             var currentBatch = new List<SoundCloudTrack>(failedTracks);
             failedTracks.Clear();
 
+            // Если у треков не было данных из-за ошибки в плейлисте — дозапрашиваем их по ID
+            var missingMeta = currentBatch.Where(t => t.Media == null && t.Id > 0).ToList();
+            if (missingMeta.Count > 0)
+            {
+                for (int b = 0; b < missingMeta.Count; b += 50)
+                {
+                    var batchIds = missingMeta.Skip(b).Take(50).Select(t => t.Id).ToList();
+                    string idsParam = string.Join("%2C", batchIds);
+                    try
+                    {
+                        string batchJson = await ApiGetStringAsync($"https://api-v2.soundcloud.com/tracks?ids={idsParam}");
+                        using var batchDoc = JsonDocument.Parse(batchJson);
+                        var restored = new Dictionary<long, SoundCloudTrack>();
+                        foreach (var elem in batchDoc.RootElement.EnumerateArray())
+                        {
+                            var track = elem.Deserialize<SoundCloudTrack>(JsonOptions);
+                            if (track != null && track.Id > 0) restored[track.Id] = track;
+                        }
+                        for (int i = 0; i < currentBatch.Count; i++)
+                        {
+                            if (currentBatch[i].Id > 0 && restored.TryGetValue(currentBatch[i].Id, out var fullTrack))
+                            {
+                                currentBatch[i] = fullTrack;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(L($"   ! Ошибка при повторном получении информации о треках: {ex.Message}",
+                                            $"   ! Error refetching tracks information: {ex.Message}"));
+                    }
+                }
+            }
+
             for (int i = 0; i < currentBatch.Count; i++)
             {
                 var track = currentBatch[i];
-                bool success = await ProcessTrackAsync(track, clientId, i + 1, currentBatch.Count);
+                bool success = await ProcessTrackAsync(track, i + 1, currentBatch.Count);
                 if (!success) failedTracks.Add(track);
             }
         }
     }
 
-    /// <summary>
-    /// Скачивает все треки из плейлиста. В ответе SoundCloud часть треков содержит полные данные,
-    /// а часть (хвост плейлиста) представлена только идентификаторами ID. Метод пачками дозагружает недостающие данные.
-    /// </summary>
-    private static async Task<List<SoundCloudTrack>> DownloadPlaylistAsync(JsonElement playlistElement, string clientId)
+    // Скачивает плейлист. Сохраняет порядок треков как в альбоме.
+    public static async Task<List<SoundCloudTrack>> DownloadPlaylistAsync(JsonElement playlistElement)
     {
         var failedTracks = new List<SoundCloudTrack>();
         if (!playlistElement.TryGetProperty("tracks", out var tracksElement) || tracksElement.ValueKind != JsonValueKind.Array)
@@ -265,39 +465,49 @@ public class Program
             return failedTracks;
         }
 
-        var trackIdsToFetch = new List<long>();
-        var tracks = new List<SoundCloudTrack>();
+        var orderedIds = new List<long>();
+        var tracksById = new Dictionary<long, SoundCloudTrack>();
+        var tracksToFetch = new List<long>();
 
-        // Разделяем треки: готовые с объектом media и неполные (только ID).
+        // Запоминаем порядок треков и сохраняем те, по которым данные уже пришли
         foreach (var trackItem in tracksElement.EnumerateArray())
         {
-            if (trackItem.TryGetProperty("media", out _))
+            if (trackItem.TryGetProperty("id", out var idElem))
             {
-                var track = trackItem.Deserialize<SoundCloudTrack>(JsonOptions);
-                if (track != null) tracks.Add(track);
-            }
-            else if (trackItem.TryGetProperty("id", out var idElem))
-            {
-                trackIdsToFetch.Add(idElem.GetInt64());
+                long id = idElem.GetInt64();
+                orderedIds.Add(id);
+
+                if (trackItem.TryGetProperty("media", out _))
+                {
+                    var track = trackItem.Deserialize<SoundCloudTrack>(JsonOptions);
+                    if (track != null) tracksById[id] = track;
+                }
+                else
+                {
+                    tracksToFetch.Add(id);
+                }
             }
         }
 
-        // Если есть треки только с ID — запрашиваем их полные данные пачками по 50 штук (ограничение API SoundCloud).
-        if (trackIdsToFetch.Count > 0)
+        // По трекам, где есть только ID, запрашиваем данные пачками по 50 штук
+        if (tracksToFetch.Count > 0)
         {
-            for (int i = 0; i < trackIdsToFetch.Count; i += 50)
+            for (int i = 0; i < tracksToFetch.Count; i += 50)
             {
-                var batch = trackIdsToFetch.Skip(i).Take(50);
+                var batch = tracksToFetch.Skip(i).Take(50);
                 string idsParam = string.Join("%2C", batch);
-                string tracksUrl = $"https://api-v2.soundcloud.com/tracks?ids={idsParam}&client_id={clientId}";
+                string tracksUrl = $"https://api-v2.soundcloud.com/tracks?ids={idsParam}";
                 try
                 {
-                    string batchJson = await httpClient.GetStringAsync(tracksUrl);
+                    string batchJson = await ApiGetStringAsync(tracksUrl);
                     using var batchDoc = JsonDocument.Parse(batchJson);
                     foreach (var trackElem in batchDoc.RootElement.EnumerateArray())
                     {
-                        var track = trackElem.Deserialize<SoundCloudTrack>(JsonOptions);
-                        if (track != null) tracks.Add(track);
+                        if (trackElem.TryGetProperty("id", out var idElem))
+                        {
+                            var track = trackElem.Deserialize<SoundCloudTrack>(JsonOptions);
+                            if (track != null) tracksById[idElem.GetInt64()] = track;
+                        }
                     }
                 }
                 catch (Exception ex)
@@ -308,38 +518,69 @@ public class Program
             }
         }
 
-        // Последовательно скачиваем каждый трек плейлиста.
+        // Собираем треки в том порядке, в каком они идут в плейлисте
+        var tracks = new List<SoundCloudTrack>();
+        var missingIds = new List<long>();
+
+        foreach (long id in orderedIds)
+        {
+            if (tracksById.TryGetValue(id, out var track))
+            {
+                tracks.Add(track);
+            }
+            else
+            {
+                missingIds.Add(id);
+                // Записываем в список ошибок, если данные трека так и не пришли
+                failedTracks.Add(new SoundCloudTrack(
+                    Id: id,
+                    Title: $"Track ID: {id}",
+                    ArtworkUrl: null,
+                    TrackAuthorization: null,
+                    User: null,
+                    Media: null
+                ));
+            }
+        }
+
+        if (missingIds.Count > 0)
+        {
+            Console.WriteLine(L(
+                $"   [!] Не удалось получить метаданные для {missingIds.Count} трек(ов) из плейлиста (ID: {string.Join(", ", missingIds.Take(10))}{(missingIds.Count > 10 ? "..." : "")}).",
+                $"   [!] Failed to fetch metadata for {missingIds.Count} playlist track(s) (IDs: {string.Join(", ", missingIds.Take(10))}{(missingIds.Count > 10 ? "..." : "")})."
+            ));
+        }
+
+        // Качаем каждый трек по очереди
         for (int i = 0; i < tracks.Count; i++)
         {
-            bool success = await ProcessTrackAsync(tracks[i], clientId, i + 1, tracks.Count);
+            bool success = await ProcessTrackAsync(tracks[i], i + 1, orderedIds.Count);
             if (!success) failedTracks.Add(tracks[i]);
         }
 
         return failedTracks;
     }
 
-    /// <summary>
-    /// Постранично выгружает все лайки пользователя через эндпоинт /users/{id}/likes (курсор next_href).
-    /// </summary>
-    private static async Task<List<SoundCloudTrack>> DownloadLikesAsync(long userId, string clientId, int totalLikes)
+    // Качает все лайки пользователя страницами по 100 штук.
+    internal static async Task<(bool Completed, List<SoundCloudTrack> FailedTracks)> DownloadLikesAsync(long userId, int totalLikes)
     {
-        // Начальный URL с лимитом 100 треков на страницу.
-        string? url = $"https://api-v2.soundcloud.com/users/{userId}/likes?client_id={clientId}&limit=100";
+        string? url = $"https://api-v2.soundcloud.com/users/{userId}/likes?limit=100";
         var failedTracks = new List<SoundCloudTrack>();
         int currentTrack = 0;
+        bool completed = true;
 
-        // Идем по ссылкам пагинации next_href, пока они возвращаются API.
         while (!string.IsNullOrEmpty(url))
         {
             string json;
             try
             {
-                json = await httpClient.GetStringAsync(url);
+                json = await ApiGetStringAsync(url);
             }
             catch (Exception ex)
             {
                 Console.WriteLine(L($"   ! Ошибка загрузки списка лайков: {ex.Message}",
                                     $"   ! Error loading likes list: {ex.Message}"));
+                completed = false;
                 break;
             }
 
@@ -349,7 +590,6 @@ public class Program
                 break;
             }
 
-            // В коллекции лайков трек находится во вложенном объекте "track".
             foreach (var item in collection.EnumerateArray())
             {
                 if (item.TryGetProperty("track", out var trackElem))
@@ -358,125 +598,135 @@ public class Program
                     if (track?.Media?.Transcodings != null)
                     {
                         currentTrack++;
-                        bool success = await ProcessTrackAsync(track, clientId, currentTrack, totalLikes);
+                        bool success = await ProcessTrackAsync(track, currentTrack, totalLikes);
                         if (!success) failedTracks.Add(track);
                     }
                 }
             }
 
-            // Получаем ссылку на следующую страницу (next_href) и проверяем наличие client_id.
+            // Ссылка на следующую страницу (next_href)
             if (doc.RootElement.TryGetProperty("next_href", out var nextHrefElem) && nextHrefElem.ValueKind == JsonValueKind.String)
             {
                 url = nextHrefElem.GetString();
-                if (url != null && !url.Contains("client_id=")) url += $"&client_id={clientId}";
             }
             else
             {
-                url = null; // Страницы закончились.
+                url = null;
             }
         }
 
-        return failedTracks;
+        return (completed, failedTracks);
     }
 
-    /// <summary>
-    /// Выполняет полный цикл обработки одного трека:
-    /// 1. Проверяет, не скачан ли файл ранее.
-    /// 2. Находит прямой progressive MP3 поток.
-    /// 3. Скачивает поток во временный файл .tmp (для защиты от обрыва соединения).
-    /// 4. Встраивает ID3-теги (название, артист) и обложку 500x500 через TagLibSharp.
-    /// 5. Атомарно переименовывает .tmp в .mp3.
-    /// </summary>
-    internal static async Task<bool> ProcessTrackAsync(SoundCloudTrack track, string clientId, int currentTrackIndex, int totalTracks)
+    // Качает один трек: выбирает поток, пишет во временный файл, вшивает теги и обложку.
+    internal static async Task<bool> ProcessTrackAsync(SoundCloudTrack track, int currentTrackIndex, int totalTracks)
     {
         string title = string.IsNullOrWhiteSpace(track.Title) ? L("Без названия", "Untitled") : track.Title.Trim();
         string artist = string.IsNullOrWhiteSpace(track.User?.Username) ? L("Неизвестный исполнитель", "Unknown artist") : track.User.Username.Trim();
 
-        // Очищаем имя файла от запрещенных символов Windows/Linux.
-        string safeFileName = SanitizeFileName($"{artist} - {title}.mp3");
         string outputDirectory = GetDownloadsDirectory();
         Directory.CreateDirectory(outputDirectory);
-        string outputPath = Path.Combine(outputDirectory, safeFileName);
-        string tempPath = outputPath + ".tmp";
+
+        string baseFileName = SanitizeFileName($"{artist} - {title}");
+        string pathM4a = Path.Combine(outputDirectory, $"{baseFileName}.m4a");
+        string pathMp3 = Path.Combine(outputDirectory, $"{baseFileName}.mp3");
+
+        // Если файл уже скачан (.m4a или .mp3) — пропускаем
+        if (System.IO.File.Exists(pathM4a) || System.IO.File.Exists(pathMp3))
+        {
+            string counterStr = totalTracks > 0 ? $"[{currentTrackIndex}/{totalTracks}]" : $"[{currentTrackIndex}]";
+            string existing = System.IO.File.Exists(pathM4a) ? $"{baseFileName}.m4a" : $"{baseFileName}.mp3";
+            Console.WriteLine(L($"   ✓ {counterStr} Уже существует: {existing}",
+                                $"   ✓ {counterStr} Already exists: {existing}"));
+            return true;
+        }
+
+        var transcodings = track.Media?.Transcodings;
+        if (transcodings == null || transcodings.Length == 0)
+        {
+            Console.WriteLine(L(
+                $"   [!] {artist} - {title}: аудиопотоки не найдены.",
+                $"   [!] {artist} - {title}: audio streams not found."
+            ));
+            return false;
+        }
+
+        // Проверяем, не подписочный ли это трек (SoundCloud Go+ с DRM)
+        bool onlyEncrypted = transcodings.All(t =>
+            t.Format?.Protocol != null &&
+            (t.Format.Protocol.Contains("encrypted") || t.Format.Protocol.Contains("drm")));
+
+        if (onlyEncrypted)
+        {
+            Console.WriteLine(L(
+                $"   [!] {artist} - {title}: трек доступен только по платной подписке SoundCloud Go+ (защищён DRM).",
+                $"   [!] {artist} - {title}: track requires SoundCloud Go+ subscription (DRM protected)."
+            ));
+            return false;
+        }
+
+        // Сначала ищем лучший поток: HLS AAC 160k (или 96k)
+        var hlsTranscoding = transcodings
+            .Where(t => t.Format?.Protocol == "hls" &&
+                        t.Format?.MimeType?.Contains("mp4") == true &&
+                        !t.Snipped)
+            .OrderByDescending(t => t.Url.Contains("aac_160k") ? 2 : 1)
+            .FirstOrDefault();
+
+        // Если HLS нет — берем обычный прямой MP3
+        var progTranscoding = transcodings
+            .FirstOrDefault(t => t.Format?.Protocol == "progressive" && !t.Snipped);
+
+        if (hlsTranscoding == null && progTranscoding == null)
+        {
+            if (transcodings.Any(t => t.Snipped))
+            {
+                Console.WriteLine(L(
+                    $"   [!] {artist} - {title}: доступен только 30-секундный превью-фрагмент (полный трек защищен).",
+                    $"   [!] {artist} - {title}: only 30-second preview snippet available (full track is restricted)."
+                ));
+            }
+            else
+            {
+                Console.WriteLine(L(
+                    $"   [!] {artist} - {title}: подходящий аудиопоток не найден.",
+                    $"   [!] {artist} - {title}: suitable audio stream not found."
+                ));
+            }
+            return false;
+        }
+
+        bool isHls = hlsTranscoding != null;
+        var selectedTranscoding = hlsTranscoding ?? progTranscoding!;
+        string extension = isHls ? ".m4a" : ".mp3";
+        string mimeType = isHls ? "audio/mp4" : "audio/mpeg";
+        string outputPath = Path.Combine(outputDirectory, $"{baseFileName}{extension}");
+        string tempPath = Path.Combine(outputDirectory, $".tmp_{baseFileName}{extension}");
 
         try
         {
-            // Пропуск трека, если он уже полностью скачан ранее.
-            if (System.IO.File.Exists(outputPath))
+            // Получаем прямую ссылку на аудиопоток
+            string streamEndpointUrl = await GetAudioStreamUrlAsync(selectedTranscoding.Url, track.TrackAuthorization);
+
+            if (isHls)
             {
-                string counterStr = totalTracks > 0 ? $"[{currentTrackIndex}/{totalTracks}]" : $"[{currentTrackIndex}]";
-                Console.WriteLine(L($"   ✓ {counterStr} Уже существует: {artist} - {title}",
-                                    $"   ✓ {counterStr} Already exists: {artist} - {title}"));
-                return true;
+                await DownloadHlsWithProgressAsync(streamEndpointUrl, tempPath, artist, title, currentTrackIndex, totalTracks);
+            }
+            else
+            {
+                await DownloadFileWithProgressAsync(streamEndpointUrl, tempPath, artist, title, currentTrackIndex, totalTracks);
             }
 
-            // Ищем именно progressive MP3 аудиопоток.
-            // HLS (m3u8) не скачивается напрямую, так как это текстовый плейлист сегментов, приводящий к битым файлам без ffmpeg.
-            var mediaTranscoding = track.Media?.Transcodings?
-                .FirstOrDefault(t => t.Format?.Protocol == "progressive");
+            // Записываем теги и обложку
+            await EmbedMetadataAsync(tempPath, mimeType, title, artist, track.ArtworkUrl ?? track.User?.AvatarUrl);
 
-            if (mediaTranscoding == null)
-            {
-                Console.WriteLine(L(
-                    $"   [!] {artist} - {title}: подходящий прогрессивный MP3 поток не найден (доступен только защищённый HLS поток).",
-                    $"   [!] {artist} - {title}: suitable progressive MP3 stream not found (HLS only)."
-                ));
-                return false;
-            }
-
-            // Запрашиваем прямую ссылку на аудиофайл в CDN SoundCloud.
-            string audioCdnUrl = await GetAudioStreamUrlAsync(mediaTranscoding.Url, clientId, track.TrackAuthorization);
-
-            // Потоковая загрузка аудиофайла во временный файл с отображением прогресс-бара.
-            await DownloadFileWithProgressAsync(audioCdnUrl, tempPath, artist, title, currentTrackIndex, totalTracks);
-
-            // Встраивание метаданных ID3v2 (исполнитель, название) и обложки через TagLibSharp.
-            try
-            {
-                using var file = TagLib.File.Create(tempPath);
-                file.Tag.Title = title;
-                file.Tag.Performers = new[] { artist };
-
-                // Обложка трека либо аватар исполнителя при отсутствии обложки.
-                string? artworkUrl = track.ArtworkUrl ?? track.User?.AvatarUrl;
-                if (!string.IsNullOrEmpty(artworkUrl))
-                {
-                    try
-                    {
-                        // SoundCloud по умолчанию отдает миниатюру 100x100 (-large). Заменяем на высокое разрешение 500x500 (-t500x500).
-                        string highResArtwork = artworkUrl.Replace("-large", "-t500x500");
-                        byte[] artworkBytes = await httpClient.GetByteArrayAsync(highResArtwork);
-
-                        file.Tag.Pictures = new TagLib.IPicture[]
-                        {
-                            new TagLib.Picture(new TagLib.ByteVector(artworkBytes))
-                            {
-                                Type = TagLib.PictureType.FrontCover,
-                                MimeType = "image/jpeg",
-                                Description = "Cover"
-                            }
-                        };
-                    }
-                    catch
-                    {
-                        // Ошибка загрузки обложки не должна препятствовать сохранению трека.
-                    }
-                }
-
-                file.Save();
-            }
-            catch
-            {
-                // Ошибка записи ID3 не должна препятствовать сохранению самого аудиофайла.
-            }
-
-            // Атомарно переименовываем проверенный и размеченный временный файл в итоговый .mp3.
+            // Убираем приставку .tmp_ из имени файла
             System.IO.File.Move(tempPath, outputPath, overwrite: true);
             return true;
         }
         catch (Exception ex)
         {
-            // При ошибке или обрыве соединения удаляем незавершенный временный файл.
+            // Если что-то пошло не так — удаляем недокачанный временный файл
             if (System.IO.File.Exists(tempPath))
             {
                 try { System.IO.File.Delete(tempPath); } catch { }
@@ -488,28 +738,155 @@ public class Program
         }
     }
 
-    /// <summary>
-    /// Динамически находит действующий Client ID в JS-скриптах на soundcloud.com.
-    /// Перебирает скрипты в обратном порядке (Reverse), так как основной бандл с ключом находится в конце HTML.
-    /// </summary>
-    internal static async Task<string> GetClientIdAsync()
+    // Качает песню по кусочкам (HLS m3u8) и собирает в один .m4a файл с прогресс-баром.
+    private static async Task DownloadHlsWithProgressAsync(
+        string playlistUrl,
+        string destinationPath,
+        string artist,
+        string title,
+        int currentTrackIndex,
+        int totalTracks)
     {
-        // Возвращаем кэшированное значение, если оно уже было найдено ранее.
-        if (!string.IsNullOrEmpty(_cachedClientId)) return _cachedClientId;
+        string m3u8Text = await httpClient.GetStringAsync(playlistUrl);
+        var baseUri = new Uri(playlistUrl);
+        string? initUrl = null;
+        var segUrls = new List<string>();
+
+        var mapMatch = Regex.Match(m3u8Text, @"#EXT-X-MAP:URI=[""']([^""']+)[""']");
+        if (mapMatch.Success)
+        {
+            initUrl = new Uri(baseUri, mapMatch.Groups[1].Value).ToString();
+        }
+
+        foreach (var rawLine in m3u8Text.Split('\n'))
+        {
+            string line = rawLine.Trim();
+            if (!string.IsNullOrEmpty(line) && !line.StartsWith("#"))
+            {
+                segUrls.Add(new Uri(baseUri, line).ToString());
+            }
+        }
+
+        if (segUrls.Count == 0)
+        {
+            throw new Exception(L("HLS плейлист не содержит аудиосегментов.", "HLS playlist contains no audio segments."));
+        }
+
+        string countStr = totalTracks > 0 ? $"{currentTrackIndex}/{totalTracks}" : $"{currentTrackIndex}";
+        Console.WriteLine(L($"🎵 [{countStr}] Скачивание (HLS): {artist} - {title}",
+                            $"🎵 [{countStr}] Downloading (HLS): {artist} - {title}"));
+
+        long totalBytesRead = 0;
+        using (var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true))
+        {
+            // Заголовок файла (init.mp4)
+            if (initUrl != null)
+            {
+                byte[] initBytes = await DownloadBytesWithRetryAsync(initUrl);
+                await fileStream.WriteAsync(initBytes);
+                totalBytesRead += initBytes.Length;
+            }
+
+            // Качаем сами кусочки музыки (.m4s)
+            for (int i = 0; i < segUrls.Count; i++)
+            {
+                byte[] segBytes = await DownloadBytesWithRetryAsync(segUrls[i]);
+                await fileStream.WriteAsync(segBytes);
+                totalBytesRead += segBytes.Length;
+
+                int downloadedSegs = i + 1;
+                double percentage = (double)downloadedSegs / segUrls.Count * 100.0;
+                string bar = GetProgressBar(percentage);
+                double mbRead = totalBytesRead / 1048576.0;
+
+                Console.Write($"\r   [{bar}] {percentage,5:F0}% ({downloadedSegs}/{segUrls.Count})  {mbRead:F2} MB");
+            }
+        }
+
+        Console.WriteLine(L("  ✓ Завершено", "  ✓ Completed"));
+    }
+
+    // Скачивает кусок файла. Если сеть моргнула — пробует еще пару раз.
+    private static async Task<byte[]> DownloadBytesWithRetryAsync(string url, int maxRetries = 3)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await httpClient.GetByteArrayAsync(url);
+            }
+            catch when (attempt < maxRetries)
+            {
+                await Task.Delay(500 * attempt);
+            }
+        }
+    }
+
+    // Вшивает в файл автора, название и обложку 500x500.
+    private static async Task EmbedMetadataAsync(string filePath, string mimeType, string title, string artist, string? artworkUrl)
+    {
+        try
+        {
+            using var file = TagLib.File.Create(filePath, mimeType, TagLib.ReadStyle.Average);
+            file.Tag.Title = title;
+            file.Tag.Performers = new[] { artist };
+
+            if (!string.IsNullOrEmpty(artworkUrl))
+            {
+                try
+                {
+                    string highResArtwork = artworkUrl.Replace("-large", "-t500x500");
+                    byte[] artworkBytes = await httpClient.GetByteArrayAsync(highResArtwork);
+
+                    // Проверяем формат картинки (PNG или JPEG)
+                    string artMime = (artworkBytes.Length > 3 && artworkBytes[0] == 0x89 && artworkBytes[1] == 0x50 && artworkBytes[2] == 0x4E)
+                        ? "image/png"
+                        : "image/jpeg";
+
+                    file.Tag.Pictures = new TagLib.IPicture[]
+                    {
+                        new TagLib.Picture(new TagLib.ByteVector(artworkBytes))
+                        {
+                            Type = TagLib.PictureType.FrontCover,
+                            MimeType = artMime,
+                            Description = "Cover"
+                        }
+                    };
+                }
+                catch
+                {
+                    // Если обложка не скачалась — ничего страшного, трек все равно сохраняем
+                }
+            }
+
+            file.Save();
+        }
+        catch
+        {
+            // Если теги не записались — файл не трогаем
+        }
+    }
+
+    // Ищет свежий client_id в скриптах на сайте. Если не нашел — берет запасной.
+    internal static async Task<string> GetClientIdAsync(bool forceRefresh = false)
+    {
+        if (!forceRefresh && !string.IsNullOrEmpty(_cachedClientId))
+        {
+            return _cachedClientId;
+        }
 
         try
         {
             string mainPageHtml = await httpClient.GetStringAsync("https://soundcloud.com");
             var scriptMatches = Regex.Matches(mainPageHtml, @"src=[""'](https://[a-zA-Z0-9\-]+\.sndcdn\.com/assets/[^""']+\.js)[""']");
 
-            // Ищем с конца: SoundCloud всегда подключает бандл приложения в последних тегах <script>.
-            // Это ускоряет поиск с 15-30 секунд до < 1 секунды.
+            // Смотрим скрипты с конца: нужный код обычно лежит в последних файлах
             foreach (Match match in scriptMatches.Cast<Match>().Reverse())
             {
                 try
                 {
                     string scriptContent = await httpClient.GetStringAsync(match.Groups[1].Value);
-                    var clientMatch = Regex.Match(scriptContent, @"client_id[:=][""']([a-zA-Z0-9]{32})[""']");
+                    var clientMatch = Regex.Match(scriptContent, @"client_id[:=]\s*[""']([a-zA-Z0-9]{32,64})[""']");
                     if (clientMatch.Success)
                     {
                         return _cachedClientId = clientMatch.Groups[1].Value;
@@ -517,33 +894,30 @@ public class Program
                 }
                 catch
                 {
-                    // Игнорируем сетевые сбои на отдельных JS-файлах и переходим к следующему.
+                    // Если один скрипт не скачался — идем к следующему
                 }
             }
         }
         catch { }
 
-        throw new InvalidOperationException(L(
-            "Не удалось получить действующий Client ID с SoundCloud. Проверьте сетевое подключение.",
-            "Failed to retrieve an active SoundCloud Client ID. Check your network connection."
-        ));
+        // Если ключ на сайте найти не удалось — берем запасной
+        return _cachedClientId = FallbackClientId;
     }
 
-    /// <summary>
-    /// Вызывает транскодирующий эндпоинт SoundCloud API для получения прямой временной ссылки на MP3 файл в CDN.
-    /// </summary>
-    private static async Task<string> GetAudioStreamUrlAsync(string transcodingUrl, string clientId, string? trackAuth)
+    // Получает прямую ссылку на аудиопоток у API.
+    public static async Task<string> GetAudioStreamUrlAsync(string transcodingUrl, string? trackAuth)
     {
-        string url = $"{transcodingUrl}?client_id={clientId}";
-        if (!string.IsNullOrEmpty(trackAuth))
+        string json = await ApiGetStringAsync(clientId =>
         {
-            url += $"&track_authorization={Uri.EscapeDataString(trackAuth)}";
-        }
+            string url = $"{transcodingUrl}?client_id={clientId}";
+            if (!string.IsNullOrEmpty(trackAuth))
+            {
+                url += $"&track_authorization={Uri.EscapeDataString(trackAuth)}";
+            }
+            return url;
+        });
 
-        string json = await httpClient.GetStringAsync(url);
         using var doc = JsonDocument.Parse(json);
-
-        // API возвращает объект {"url": "https://cf-media.sndcdn.com/..."}.
         if (doc.RootElement.TryGetProperty("url", out var urlElement))
         {
             return urlElement.GetString() ?? throw new Exception(L("Получен пустой URL аудиопотока.", "Received an empty audio stream URL."));
@@ -552,9 +926,7 @@ public class Program
         throw new Exception(L("Не удалось извлечь URL потока из ответа API.", "Failed to extract stream URL from API response."));
     }
 
-    /// <summary>
-    /// Скачивает файл потоком блоками по 16 КБ, обновляя прогресс-бар в консоли без лишней нагрузки на ЦП.
-    /// </summary>
+    // Качает обычный прямой файл (MP3) с полосой загрузки.
     private static async Task DownloadFileWithProgressAsync(
         string downloadUrl,
         string destinationPath,
@@ -563,7 +935,6 @@ public class Program
         int currentTrackIndex,
         int totalTracks)
     {
-        // ResponseHeadersRead позволяет начать чтение потока сразу, не загружая весь файл в RAM.
         using var response = await httpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
 
@@ -587,7 +958,6 @@ public class Program
             await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead));
             totalBytesRead += bytesRead;
 
-            // Ограничиваем частоту перерисовки консоли (не чаще одного раза в 80 мс), чтобы избежать мерцания.
             long elapsed = stopwatch.ElapsedMilliseconds;
             if (elapsed - lastRenderTicks > 80 || totalBytesRead == totalBytes)
             {
@@ -598,13 +968,11 @@ public class Program
                 {
                     double percentage = (double)totalBytesRead / totalBytes * 100.0;
                     double mbTotal = totalBytes / 1048576.0;
-                    int filled = Math.Clamp((int)(percentage / 100.0 * 30), 0, 30);
-                    string bar = new string('█', filled) + new string('░', 30 - filled);
+                    string bar = GetProgressBar(percentage);
                     Console.Write($"\r   [{bar}] {percentage,5:F1}%  {mbRead:F2} / {mbTotal:F2} MB");
                 }
                 else
                 {
-                    // Если заголовок Content-Length не передан сервером, выводим только количество скачанных МБ.
                     Console.Write($"\r   {mbRead:F2} MB");
                 }
             }
@@ -613,15 +981,18 @@ public class Program
         Console.WriteLine(L("  ✓ Завершено", "  ✓ Completed"));
     }
 
-    /// <summary>
-    /// Очищает имя файла от символов, запрещенных файловыми системами (Windows, Linux, macOS),
-    /// и обрезает слишком длинные имена во избежание превышения лимита MAX_PATH.
-    /// </summary>
-    internal static string SanitizeFileName(string name)
+    // Рисует полоску прогресса: █ и ░.
+    internal static string GetProgressBar(double percentage, int width = 30)
+    {
+        int filled = Math.Clamp((int)(percentage / 100.0 * width), 0, width);
+        return new string('█', filled) + new string('░', width - filled);
+    }
+
+    // Убирает запрещенные символы из имени файла и режет длину до 180 символов.
+    public static string SanitizeFileName(string name)
     {
         var invalidChars = Path.GetInvalidFileNameChars();
 
-        // Заменяем все запрещенные символы на символ подчеркивания '_'.
         string clean = string.Create(name.Length, (name, invalidChars), (span, state) =>
         {
             for (int i = 0; i < state.name.Length; i++)
@@ -631,59 +1002,60 @@ public class Program
             }
         }).Trim(' ', '.');
 
-        // Ограничиваем длину имени файла до 180 символов с сохранением расширения (защита от MAX_PATH в Windows).
         const int maxLen = 180;
         if (clean.Length > maxLen)
         {
-            string ext = Path.GetExtension(clean);
-            string baseName = Path.GetFileNameWithoutExtension(clean);
-            int availableBase = maxLen - ext.Length;
-            if (availableBase > 0 && baseName.Length > availableBase)
-            {
-                clean = baseName[..availableBase].TrimEnd() + ext;
-            }
+            clean = clean[..maxLen].TrimEnd(' ', '.');
         }
 
-        // Если после очистки имя пустое — генерируем уникальное имя по таймстампу.
-        return string.IsNullOrWhiteSpace(clean) || clean.Equals(".mp3", StringComparison.OrdinalIgnoreCase)
-            ? $"track_{DateTime.UtcNow.Ticks}.mp3"
-            : clean;
+        if (string.IsNullOrWhiteSpace(clean))
+        {
+            return $"track_{DateTime.UtcNow.Ticks}";
+        }
+
+        if (WindowsReservedNames.Contains(clean))
+        {
+            return $"_{clean}";
+        }
+
+        return clean;
     }
 
-    /// <summary>
-    /// Кроссплатформенно возвращает абсолютный путь к папке «Загрузки» текущего пользователя ОС.
-    /// </summary>
+    // Путь к папке «Загрузки» (Downloads) текущего пользователя.
     internal static string GetDownloadsDirectory() =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads");
 }
 
-// -------------------------------------------------------------------------------------------------
-// DTO-модели данных для строго типизированной десериализации JSON-ответов SoundCloud v2 API.
-// -------------------------------------------------------------------------------------------------
+// Модели для чтения ответов от SoundCloud API.
 
-/// <summary>Модель трека SoundCloud.</summary>
+// Данные трека.
 public record SoundCloudTrack(
-    string? Title,
-    [property: JsonPropertyName("artwork_url")] string? ArtworkUrl,
-    [property: JsonPropertyName("track_authorization")] string? TrackAuthorization,
-    SoundCloudUser? User,
-    SoundCloudMedia? Media
+    long Id = 0,
+    string? Title = null,
+    [property: JsonPropertyName("artwork_url")] string? ArtworkUrl = null,
+    [property: JsonPropertyName("track_authorization")] string? TrackAuthorization = null,
+    SoundCloudUser? User = null,
+    SoundCloudMedia? Media = null
 );
 
-/// <summary>Модель пользователя (автора трека).</summary>
+// Автор трека.
 public record SoundCloudUser(
     string? Username,
     [property: JsonPropertyName("avatar_url")] string? AvatarUrl
 );
 
-/// <summary>Контейнер доступных медиа-потоков трека.</summary>
+// Список аудиопотоков трека.
 public record SoundCloudMedia(Transcoding[]? Transcodings);
 
-/// <summary>Информация об отдельном медиа-потоке (URL транскодинга и формат).</summary>
+// Один аудиопоток трека.
 public record Transcoding(
     string Url,
-    TranscodingFormat? Format
+    TranscodingFormat? Format,
+    [property: JsonPropertyName("snipped")] bool Snipped
 );
 
-/// <summary>Формат протокола медиа-потока: "progressive" (прямой MP3) или "hls" (сегментированный).</summary>
-public record TranscodingFormat(string Protocol);
+// Формат потока (hls или progressive).
+public record TranscodingFormat(
+    string Protocol,
+    [property: JsonPropertyName("mime_type")] string? MimeType
+);
